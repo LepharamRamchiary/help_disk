@@ -1,0 +1,6 @@
+{
+  "name": "HelpDesk Pro — Enterprise Customer Support SaaS",
+  "description": "Multi-tenant customer support, ticketing, SLA monitoring, and analytics platform built with an emerald-green design system.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
