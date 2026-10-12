@@ -1,0 +1,1 @@
+console.log("API Gateway is running on port 3000");
