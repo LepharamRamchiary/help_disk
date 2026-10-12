@@ -1,0 +1,16 @@
+{
+  "name": "api-gateway",
+  "version": "1.0.0",
+  "description": "This is the api gateway for distributing the api to other service",
+  "keywords": [
+    "Nodejs",
+    "express.js"
+  ],
+  "license": "ISC",
+  "author": "Lepharam Ramchiary",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}
