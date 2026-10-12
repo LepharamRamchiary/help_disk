@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { useHelpDesk, SimulationState } from '@/context/HelpDeskContext';
-import { PageView, UserRole } from '@/types/helpdesk';
-import { Avatar, Modal } from '@/components/ui/design-system';
-import { SPRING_BOOT_ENDPOINTS, SPRING_BOOT_API_CONFIG } from '@/services/api';
+import React, { useState, useEffect, useMemo } from "react";
+import { useHelpDesk, SimulationState } from "@/context/HelpDeskContext";
+import { PageView, UserRole } from "@/types/helpdesk";
+import { Avatar, Modal } from "@/components/ui/design-system";
+import { SPRING_BOOT_ENDPOINTS, SPRING_BOOT_API_CONFIG } from "@/services/api";
 import {
   Headset,
   LayoutDashboard,
@@ -22,7 +22,6 @@ import {
   Bell,
   Search,
   ChevronLeft,
-  ChevronRight,
   ChevronDown,
   Plus,
   Building2,
@@ -34,11 +33,9 @@ import {
   X,
   Globe,
   Code2,
-  SlidersHorizontal,
   KeyRound,
   UserPlus,
-  ExternalLink,
-} from 'lucide-react';
+} from "lucide-react";
 
 interface NavItem {
   id: PageView;
@@ -85,69 +82,72 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [notifPopoverOpen, setNotifPopoverOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [searchModalOpen, setSearchModalOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Global keyboard shortcut Cmd+K / Ctrl+K for search
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setSearchModalOpen((prev) => !prev);
       }
     };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
   const unassignedCount = useMemo(
-    () => tickets.filter((t) => !t.assignedAgentId && t.status !== 'CLOSED').length,
-    [tickets]
+    () =>
+      tickets.filter((t) => !t.assignedAgentId && t.status !== "CLOSED").length,
+    [tickets],
   );
   const urgentCount = useMemo(
     () =>
       tickets.filter(
         (t) =>
-          (t.priority === 'URGENT' || t.slaStatus === 'AT_RISK' || t.slaStatus === 'BREACHED') &&
-          t.status !== 'RESOLVED' &&
-          t.status !== 'CLOSED'
+          (t.priority === "URGENT" ||
+            t.slaStatus === "AT_RISK" ||
+            t.slaStatus === "BREACHED") &&
+          t.status !== "RESOLVED" &&
+          t.status !== "CLOSED",
       ).length,
-    [tickets]
+    [tickets],
   );
   const myTicketsCount = useMemo(
     () =>
       tickets.filter(
         (t) =>
           t.assignedAgentId === currentUser.id &&
-          t.status !== 'RESOLVED' &&
-          t.status !== 'CLOSED'
+          t.status !== "RESOLVED" &&
+          t.status !== "CLOSED",
       ).length,
-    [tickets, currentUser.id]
+    [tickets, currentUser.id],
   );
 
   const navSections: NavSection[] = useMemo(() => {
-    if (currentUser.role === 'CUSTOMER') {
+    if (currentUser.role === "CUSTOMER") {
       return [
         {
-          title: 'Customer Portal',
+          title: "Customer Portal",
           items: [
             {
-              id: 'customer-portal',
-              label: 'My Support Portal',
+              id: "customer-portal",
+              label: "My Support Portal",
               icon: Globe,
-              roles: ['CUSTOMER'],
+              roles: ["CUSTOMER"],
             },
             {
-              id: 'create-ticket',
-              label: 'Submit a Request',
+              id: "create-ticket",
+              label: "Submit a Request",
               icon: Plus,
-              roles: ['CUSTOMER'],
+              roles: ["CUSTOMER"],
             },
             {
-              id: 'notifications',
-              label: 'Notifications',
+              id: "notifications",
+              label: "Notifications",
               icon: Bell,
               badgeCount: unreadNotificationsCount || undefined,
-              roles: ['CUSTOMER'],
+              roles: ["CUSTOMER"],
             },
           ],
         },
@@ -156,110 +156,150 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
     const sections: NavSection[] = [
       {
-        title: 'Workspace',
+        title: "Workspace",
         items: [
           {
-            id: 'overview',
-            label: 'Overview',
+            id: "overview",
+            label: "Overview",
             icon: LayoutDashboard,
-            roles: ['PLATFORM_ADMIN', 'COMPANY_ADMIN', 'SUPPORT_MANAGER', 'SUPPORT_AGENT'],
+            roles: [
+              "PLATFORM_ADMIN",
+              "COMPANY_ADMIN",
+              "SUPPORT_MANAGER",
+              "SUPPORT_AGENT",
+            ],
           },
           {
-            id: 'tickets',
-            label: 'All Tickets',
+            id: "tickets",
+            label: "All Tickets",
             icon: TicketIcon,
             badgeCount: tickets.length,
-            roles: ['PLATFORM_ADMIN', 'COMPANY_ADMIN', 'SUPPORT_MANAGER', 'SUPPORT_AGENT'],
+            roles: [
+              "PLATFORM_ADMIN",
+              "COMPANY_ADMIN",
+              "SUPPORT_MANAGER",
+              "SUPPORT_AGENT",
+            ],
           },
           {
-            id: 'my-tickets',
-            label: 'My Tickets',
+            id: "my-tickets",
+            label: "My Tickets",
             icon: UserCheck,
             badgeCount: myTicketsCount || undefined,
-            roles: ['PLATFORM_ADMIN', 'COMPANY_ADMIN', 'SUPPORT_MANAGER', 'SUPPORT_AGENT'],
+            roles: [
+              "PLATFORM_ADMIN",
+              "COMPANY_ADMIN",
+              "SUPPORT_MANAGER",
+              "SUPPORT_AGENT",
+            ],
           },
           {
-            id: 'unassigned',
-            label: 'Unassigned',
+            id: "unassigned",
+            label: "Unassigned",
             icon: Inbox,
             badgeCount: unassignedCount || undefined,
-            roles: ['PLATFORM_ADMIN', 'COMPANY_ADMIN', 'SUPPORT_MANAGER', 'SUPPORT_AGENT'],
+            roles: [
+              "PLATFORM_ADMIN",
+              "COMPANY_ADMIN",
+              "SUPPORT_MANAGER",
+              "SUPPORT_AGENT",
+            ],
           },
           {
-            id: 'priority-queue',
-            label: 'Priority Queue',
+            id: "priority-queue",
+            label: "Priority Queue",
             icon: Flame,
             badgeCount: urgentCount || undefined,
-            roles: ['PLATFORM_ADMIN', 'COMPANY_ADMIN', 'SUPPORT_MANAGER', 'SUPPORT_AGENT'],
+            roles: [
+              "PLATFORM_ADMIN",
+              "COMPANY_ADMIN",
+              "SUPPORT_MANAGER",
+              "SUPPORT_AGENT",
+            ],
           },
         ],
       },
       {
-        title: 'Management',
+        title: "Management",
         items: [
           {
-            id: 'customers',
-            label: 'Customers',
+            id: "customers",
+            label: "Customers",
             icon: Users,
-            roles: ['PLATFORM_ADMIN', 'COMPANY_ADMIN', 'SUPPORT_MANAGER', 'SUPPORT_AGENT'],
+            roles: [
+              "PLATFORM_ADMIN",
+              "COMPANY_ADMIN",
+              "SUPPORT_MANAGER",
+              "SUPPORT_AGENT",
+            ],
           },
           {
-            id: 'team',
-            label: 'Team Members',
+            id: "team",
+            label: "Team Members",
             icon: UserCog,
-            roles: ['PLATFORM_ADMIN', 'COMPANY_ADMIN', 'SUPPORT_MANAGER'],
+            roles: ["PLATFORM_ADMIN", "COMPANY_ADMIN", "SUPPORT_MANAGER"],
           },
           {
-            id: 'reports',
-            label: 'Reports & Analytics',
+            id: "reports",
+            label: "Reports & Analytics",
             icon: BarChart3,
-            roles: ['PLATFORM_ADMIN', 'COMPANY_ADMIN', 'SUPPORT_MANAGER'],
+            roles: ["PLATFORM_ADMIN", "COMPANY_ADMIN", "SUPPORT_MANAGER"],
           },
           {
-            id: 'sla',
-            label: 'SLA Monitoring',
+            id: "sla",
+            label: "SLA Monitoring",
             icon: ShieldAlert,
-            roles: ['PLATFORM_ADMIN', 'COMPANY_ADMIN', 'SUPPORT_MANAGER', 'SUPPORT_AGENT'],
+            roles: [
+              "PLATFORM_ADMIN",
+              "COMPANY_ADMIN",
+              "SUPPORT_MANAGER",
+              "SUPPORT_AGENT",
+            ],
           },
         ],
       },
       {
-        title: 'Configuration',
+        title: "Configuration",
         items: [
           {
-            id: 'categories',
-            label: 'Categories',
+            id: "categories",
+            label: "Categories",
             icon: FolderKanban,
-            roles: ['PLATFORM_ADMIN', 'COMPANY_ADMIN', 'SUPPORT_MANAGER'],
+            roles: ["PLATFORM_ADMIN", "COMPANY_ADMIN", "SUPPORT_MANAGER"],
           },
           {
-            id: 'automations',
-            label: 'Automations',
+            id: "automations",
+            label: "Automations",
             icon: Workflow,
-            roles: ['PLATFORM_ADMIN', 'COMPANY_ADMIN', 'SUPPORT_MANAGER'],
+            roles: ["PLATFORM_ADMIN", "COMPANY_ADMIN", "SUPPORT_MANAGER"],
           },
           {
-            id: 'settings',
-            label: 'Company Settings',
+            id: "settings",
+            label: "Company Settings",
             icon: Settings,
-            roles: ['PLATFORM_ADMIN', 'COMPANY_ADMIN'],
+            roles: ["PLATFORM_ADMIN", "COMPANY_ADMIN"],
           },
         ],
       },
       {
-        title: 'Portals & SaaS Ops',
+        title: "Portals & SaaS Ops",
         items: [
           {
-            id: 'customer-portal',
-            label: 'Customer Portal',
+            id: "customer-portal",
+            label: "Customer Portal",
             icon: Globe,
-            roles: ['PLATFORM_ADMIN', 'COMPANY_ADMIN', 'SUPPORT_MANAGER', 'SUPPORT_AGENT'],
+            roles: [
+              "PLATFORM_ADMIN",
+              "COMPANY_ADMIN",
+              "SUPPORT_MANAGER",
+              "SUPPORT_AGENT",
+            ],
           },
           {
-            id: 'platform-admin',
-            label: 'Platform Admin',
+            id: "platform-admin",
+            label: "Platform Admin",
             icon: Building2,
-            roles: ['PLATFORM_ADMIN', 'COMPANY_ADMIN'],
+            roles: ["PLATFORM_ADMIN", "COMPANY_ADMIN"],
           },
         ],
       },
@@ -268,38 +308,47 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return sections
       .map((sec) => ({
         ...sec,
-        items: sec.items.filter((item) => item.roles.includes(currentUser.role)),
+        items: sec.items.filter((item) =>
+          item.roles.includes(currentUser.role),
+        ),
       }))
       .filter((sec) => sec.items.length > 0);
-  }, [currentUser.role, tickets.length, myTicketsCount, unassignedCount, urgentCount, unreadNotificationsCount]);
+  }, [
+    currentUser.role,
+    tickets.length,
+    myTicketsCount,
+    unassignedCount,
+    urgentCount,
+    unreadNotificationsCount,
+  ]);
 
   const viewTitleMap: Record<PageView, { section: string; label: string }> = {
-    landing: { section: 'Public', label: 'Landing Page' },
-    login: { section: 'Auth', label: 'Sign In' },
-    register: { section: 'Auth', label: 'Create Organization' },
-    'forgot-password': { section: 'Auth', label: 'Password Recovery' },
-    overview: { section: 'Workspace', label: 'Overview' },
-    tickets: { section: 'Workspace', label: 'All Tickets' },
-    'my-tickets': { section: 'Workspace', label: 'My Tickets' },
-    unassigned: { section: 'Workspace', label: 'Unassigned Queue' },
-    'priority-queue': { section: 'Workspace', label: 'Priority Queue' },
-    'create-ticket': { section: 'Workspace', label: 'New Support Ticket' },
-    'ticket-detail': { section: 'Tickets', label: 'Ticket Conversation' },
-    customers: { section: 'Management', label: 'Customers' },
-    team: { section: 'Management', label: 'Team Members' },
-    reports: { section: 'Management', label: 'Reports & Analytics' },
-    sla: { section: 'Management', label: 'SLA Monitoring' },
-    categories: { section: 'Configuration', label: 'Categories' },
-    automations: { section: 'Configuration', label: 'Automations' },
-    settings: { section: 'Configuration', label: 'Company Settings' },
-    notifications: { section: 'Workspace', label: 'Notifications Center' },
-    'customer-portal': { section: 'Portal', label: 'Customer Support Portal' },
-    'platform-admin': { section: 'Platform', label: 'Platform Administration' },
+    landing: { section: "Public", label: "Landing Page" },
+    login: { section: "Auth", label: "Sign In" },
+    register: { section: "Auth", label: "Create Organization" },
+    "forgot-password": { section: "Auth", label: "Password Recovery" },
+    overview: { section: "Workspace", label: "Overview" },
+    tickets: { section: "Workspace", label: "All Tickets" },
+    "my-tickets": { section: "Workspace", label: "My Tickets" },
+    unassigned: { section: "Workspace", label: "Unassigned Queue" },
+    "priority-queue": { section: "Workspace", label: "Priority Queue" },
+    "create-ticket": { section: "Workspace", label: "New Support Ticket" },
+    "ticket-detail": { section: "Tickets", label: "Ticket Conversation" },
+    customers: { section: "Management", label: "Customers" },
+    team: { section: "Management", label: "Team Members" },
+    reports: { section: "Management", label: "Reports & Analytics" },
+    sla: { section: "Management", label: "SLA Monitoring" },
+    categories: { section: "Configuration", label: "Categories" },
+    automations: { section: "Configuration", label: "Automations" },
+    settings: { section: "Configuration", label: "Company Settings" },
+    notifications: { section: "Workspace", label: "Notifications Center" },
+    "customer-portal": { section: "Portal", label: "Customer Support Portal" },
+    "platform-admin": { section: "Platform", label: "Platform Administration" },
   };
 
   const currentBreadcrumb = viewTitleMap[currentView] || {
-    section: 'Workspace',
-    label: 'Overview',
+    section: "Workspace",
+    label: "Overview",
   };
 
   // Search results for global Cmd+K dialog
@@ -312,7 +361,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           t.id.toLowerCase().includes(q) ||
           t.subject.toLowerCase().includes(q) ||
           t.customerName.toLowerCase().includes(q) ||
-          t.customerOrganization.toLowerCase().includes(q)
+          t.customerOrganization.toLowerCase().includes(q),
       )
       .slice(0, 6);
   }, [tickets, searchQuery]);
@@ -325,88 +374,77 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         (c) =>
           c.fullName.toLowerCase().includes(q) ||
           c.organization.toLowerCase().includes(q) ||
-          c.email.toLowerCase().includes(q)
+          c.email.toLowerCase().includes(q),
       )
       .slice(0, 4);
   }, [customers, searchQuery]);
 
   // Landing & Auth views render full screen without the internal sidebar
   if (
-    currentView === 'landing' ||
-    currentView === 'login' ||
-    currentView === 'register' ||
-    currentView === 'forgot-password'
+    currentView === "landing" ||
+    currentView === "login" ||
+    currentView === "register" ||
+    currentView === "forgot-password"
   ) {
     return <div className="min-h-screen bg-[#F8FAFC]">{children}</div>;
   }
 
-  const isDarkSidebar = sidebarStyle === 'dark-emerald';
+  const isDarkSidebar = sidebarStyle === "dark-emerald";
 
   const renderSidebarContent = (isMobile = false) => {
     const collapsed = !isMobile && sidebarCollapsed;
+
+    // Labels never unmount, they only fade, so icons never move
+    const fade = `transition-opacity duration-200 ${
+      collapsed ? "opacity-0 pointer-events-none" : "opacity-100 delay-100"
+    }`;
+
     return (
       <div
-        className={`flex flex-col h-full select-none transition-colors duration-150 ${
+        className={`flex flex-col h-full w-full select-none overflow-hidden transition-colors duration-150 ${
           isDarkSidebar
-            ? 'bg-[#102A23] text-slate-100 border-r border-[#102A23]'
-            : 'bg-white text-[#111827] border-r border-[#E2E8F0]'
+            ? "bg-[#102A23] text-slate-100 border-r border-[#102A23]"
+            : "bg-white text-[#111827] border-r border-[#E2E8F0]"
         }`}
       >
-        {/* Brand Header */}
+        {/* Brand Header — logo is always at the same x (18px → center = 36px) */}
         <div
-          className={`flex items-center justify-between h-16 px-4 border-b ${
-            isDarkSidebar ? 'border-emerald-900/60' : 'border-[#E2E8F0]'
+          className={`flex items-center justify-between h-16 px-[18px] shrink-0 border-b ${
+            isDarkSidebar ? "border-emerald-900/60" : "border-[#E2E8F0]"
           }`}
         >
           <button
             type="button"
             onClick={() =>
-              navigateTo(currentUser.role === 'CUSTOMER' ? 'customer-portal' : 'overview')
+              navigateTo(
+                currentUser.role === "CUSTOMER"
+                  ? "customer-portal"
+                  : "overview",
+              )
             }
             className="flex items-center gap-3 text-left focus-visible:outline-2 focus-visible:outline-[#10B981] rounded-lg"
           >
             <div className="w-9 h-9 rounded-xl bg-[#047857] text-white flex items-center justify-center shadow-xs shrink-0">
               <Headset className="w-5 h-5" />
             </div>
-            {!collapsed && (
-              <div className="overflow-hidden">
-                <div
-                  className={`text-sm font-bold tracking-tight whitespace-nowrap ${
-                    isDarkSidebar ? 'text-white' : 'text-[#111827]'
-                  }`}
-                >
-                  HelpDesk Pro
-                </div>
-                <div
-                  className={`text-[11px] whitespace-nowrap ${
-                    isDarkSidebar ? 'text-emerald-300/80' : 'text-[#64748B]'
-                  }`}
-                >
-                  Customer Support Cloud
-                </div>
+            <div className={`overflow-hidden ${fade}`}>
+              <div
+                className={`text-sm font-bold tracking-tight whitespace-nowrap ${
+                  isDarkSidebar ? "text-white" : "text-[#111827]"
+                }`}
+              >
+                HelpDesk Pro
               </div>
-            )}
+              <div
+                className={`text-[11px] whitespace-nowrap ${
+                  isDarkSidebar ? "text-emerald-300/80" : "text-[#64748B]"
+                }`}
+              >
+                Customer Support Cloud
+              </div>
+            </div>
           </button>
 
-          {!isMobile && (
-            <button
-              type="button"
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              className={`p-1.5 rounded-lg transition-colors ${
-                isDarkSidebar
-                  ? 'text-emerald-300/70 hover:text-white hover:bg-emerald-900/50'
-                  : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
-              }`}
-            >
-              {collapsed ? (
-                <ChevronRight className="w-4 h-4" />
-              ) : (
-                <ChevronLeft className="w-4 h-4" />
-              )}
-            </button>
-          )}
           {isMobile && (
             <button
               type="button"
@@ -419,37 +457,47 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           )}
         </div>
 
-        {/* Organization Switcher */}
-        {!collapsed && currentUser.role !== 'CUSTOMER' && (
-          <div className="px-3 pt-3 pb-1 relative">
+        {/* Organization Switcher — always rendered so vertical positions never shift */}
+        {currentUser.role !== "CUSTOMER" && (
+          <div className="px-3 pt-3 pb-1 relative shrink-0">
             <button
               type="button"
-              onClick={() => setOrgMenuOpen((prev) => !prev)}
-              className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl border text-left transition-colors ${
+              onClick={() => !collapsed && setOrgMenuOpen((prev) => !prev)}
+              title={collapsed ? currentOrganization.name : undefined}
+              className={`w-full flex items-center justify-between ${
+                collapsed ? "gap-0" : "gap-2"
+              } px-[11px] py-2 rounded-xl border text-left overflow-hidden transition-colors ${
                 isDarkSidebar
-                  ? 'bg-emerald-950/60 border-emerald-800/60 hover:bg-emerald-900/50 text-white'
-                  : 'bg-[#F8FAFC] border-[#E2E8F0] hover:bg-slate-100/70 text-[#111827]'
+                  ? "bg-emerald-950/60 border-emerald-800/60 hover:bg-emerald-900/50 text-white"
+                  : "bg-[#F8FAFC] border-[#E2E8F0] hover:bg-slate-100/70 text-[#111827]"
               }`}
             >
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="w-6 h-6 rounded-md bg-[#047857]/15 text-[#10B981] font-bold text-xs flex items-center justify-center shrink-0">
                   {currentOrganization.name.slice(0, 1)}
                 </div>
-                <div className="min-w-0">
-                  <div className="text-xs font-semibold truncate">{currentOrganization.name}</div>
+                <div className={`min-w-0 ${fade}`}>
+                  <div className="text-xs font-semibold truncate whitespace-nowrap">
+                    {currentOrganization.name}
+                  </div>
                   <div
-                    className={`text-[11px] truncate ${
-                      isDarkSidebar ? 'text-emerald-300/70' : 'text-[#64748B]'
+                    className={`text-[11px] truncate whitespace-nowrap ${
+                      isDarkSidebar ? "text-emerald-300/70" : "text-[#64748B]"
                     }`}
                   >
                     {currentOrganization.plan} · {currentOrganization.domain}
                   </div>
                 </div>
               </div>
-              <ChevronDown className="w-3.5 h-3.5 opacity-60 shrink-0" />
+              {/* Chevron collapses its width so it never squeezes the "A" logo */}
+              <ChevronDown
+                className={`shrink-0 h-3.5 transition-all duration-200 ${
+                  collapsed ? "w-0 opacity-0" : "w-3.5 opacity-60 delay-100"
+                }`}
+              />
             </button>
 
-            {orgMenuOpen && (
+            {orgMenuOpen && !collapsed && (
               <div className="absolute left-3 right-3 top-16 z-30 bg-white border border-[#E2E8F0] rounded-xl shadow-lg py-1.5 text-[#111827]">
                 <div className="px-3 py-1 text-[11px] font-medium text-[#64748B]">
                   Switch Tenant Organization
@@ -464,12 +512,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     }}
                     className={`w-full flex items-center justify-between px-3 py-2 text-xs text-left hover:bg-[#F0FDF4] transition-colors ${
                       org.id === currentOrganization.id
-                        ? 'bg-[#ECFDF5] text-[#047857] font-semibold'
-                        : 'text-slate-700'
+                        ? "bg-[#ECFDF5] text-[#047857] font-semibold"
+                        : "text-slate-700"
                     }`}
                   >
                     <span className="truncate">{org.name}</span>
-                    <span className="text-[11px] text-slate-400 font-mono">{org.plan}</span>
+                    <span className="text-[11px] text-slate-400 font-mono">
+                      {org.plan}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -477,25 +527,42 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         )}
 
-        {/* Primary Navigation Links */}
-        <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-5" aria-label="Main Navigation">
-          {navSections.map((section) => (
+        {/* Primary Navigation Links — scrollbar hidden when collapsed so icons stay centered */}
+        <nav
+          className={`flex-1 overflow-y-auto overflow-x-hidden px-3 py-3 space-y-5 ${
+            collapsed
+              ? "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              : ""
+          }`}
+          aria-label="Main Navigation"
+        >
+          {navSections.map((section, idx) => (
             <div key={section.title}>
-              {!collapsed && (
-                <div
-                  className={`px-2.5 pb-1.5 text-[11px] font-semibold tracking-wider uppercase ${
-                    isDarkSidebar ? 'text-emerald-300/60' : 'text-[#64748B]'
+              {/* Title row keeps its height: text fades out, divider fades in when collapsed */}
+              <div className="relative h-6 px-4 pb-1.5 flex items-center overflow-hidden">
+                <span
+                  className={`text-[11px] font-semibold tracking-wider uppercase whitespace-nowrap ${fade} ${
+                    isDarkSidebar ? "text-emerald-300/60" : "text-[#64748B]"
                   }`}
                 >
                   {section.title}
-                </div>
-              )}
+                </span>
+
+                {idx > 0 && (
+                  <span
+                    className={`absolute left-4 right-4 top-1/2 h-px transition-opacity duration-200 ${
+                      collapsed ? "opacity-100 delay-100" : "opacity-0"
+                    } ${isDarkSidebar ? "bg-emerald-800/60" : "bg-[#E2E8F0]"}`}
+                  />
+                )}
+              </div>
+
               <div className="space-y-0.5">
                 {section.items.map((item) => {
                   const Icon = item.icon;
                   const isActive =
                     currentView === item.id ||
-                    (item.id === 'tickets' && currentView === 'ticket-detail');
+                    (item.id === "tickets" && currentView === "ticket-detail");
 
                   return (
                     <button
@@ -506,16 +573,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         navigateTo(item.id);
                         if (isMobile) setMobileMenuOpen(false);
                       }}
-                      className={`w-full flex items-center ${
-                        collapsed ? 'justify-center px-2' : 'justify-between px-2.5'
-                      } py-2 rounded-lg text-xs font-medium transition-colors duration-150 ${
+                      className={`w-full flex items-center justify-between px-4 py-2 rounded-lg overflow-hidden text-xs font-medium transition-colors duration-150 ${
                         isActive
                           ? isDarkSidebar
-                            ? 'bg-[#047857] text-white font-semibold shadow-xs'
-                            : 'bg-[#ECFDF5] text-[#047857] font-semibold'
+                            ? "bg-[#047857] text-white font-semibold shadow-xs"
+                            : "bg-[#ECFDF5] text-[#047857] font-semibold"
                           : isDarkSidebar
-                          ? 'text-slate-300 hover:bg-emerald-900/50 hover:text-white'
-                          : 'text-slate-600 hover:bg-[#F0FDF4] hover:text-[#111827]'
+                            ? "text-slate-300 hover:bg-emerald-900/50 hover:text-white"
+                            : "text-slate-600 hover:bg-[#F0FDF4] hover:text-[#111827]"
                       }`}
                     >
                       <span className="flex items-center gap-2.5 min-w-0">
@@ -523,27 +588,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                           className={`w-4 h-4 shrink-0 ${
                             isActive
                               ? isDarkSidebar
-                                ? 'text-white'
-                                : 'text-[#047857]'
+                                ? "text-white"
+                                : "text-[#047857]"
                               : isDarkSidebar
-                              ? 'text-emerald-300/70'
-                              : 'text-slate-400'
+                                ? "text-emerald-300/70"
+                                : "text-slate-400"
                           }`}
                         />
-                        {!collapsed && (
-                          <span className="truncate whitespace-nowrap">{item.label}</span>
-                        )}
+                        <span className={`truncate whitespace-nowrap ${fade}`}>
+                          {item.label}
+                        </span>
                       </span>
-                      {!collapsed && item.badgeCount !== undefined && (
+                      {item.badgeCount !== undefined && (
                         <span
-                          className={`font-mono tabular-nums text-[11px] px-1.5 py-0.5 rounded-md ${
+                          className={`shrink-0 font-mono tabular-nums text-[11px] px-1.5 py-0.5 rounded-md ${fade} ${
                             isActive
                               ? isDarkSidebar
-                                ? 'bg-emerald-900 text-emerald-100'
-                                : 'bg-[#047857]/10 text-[#047857] font-semibold'
+                                ? "bg-emerald-900 text-emerald-100"
+                                : "bg-[#047857]/10 text-[#047857] font-semibold"
                               : isDarkSidebar
-                              ? 'text-emerald-300/70'
-                              : 'text-[#64748B]'
+                                ? "text-emerald-300/70"
+                                : "text-[#64748B]"
                           }`}
                         >
                           {item.badgeCount}
@@ -557,63 +622,50 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
 
-        {/* Bottom Role & User Profile Section */}
+        {/* Bottom: profile + sign out — same layout in both states */}
         <div
-          className={`p-3 border-t ${
-            isDarkSidebar ? 'border-emerald-900/60' : 'border-[#E2E8F0]'
+          className={`p-3 border-t shrink-0 space-y-1 ${
+            isDarkSidebar ? "border-emerald-900/60" : "border-[#E2E8F0]"
           }`}
         >
-          {!collapsed ? (
-            <div className="space-y-2.5">
-              <div className="flex items-center justify-between gap-2 px-1">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <Avatar initials={currentUser.avatarInitials} size="sm" variant="emerald" />
-                  <div className="min-w-0">
-                    <div
-                      className={`text-xs font-semibold truncate ${
-                        isDarkSidebar ? 'text-white' : 'text-[#111827]'
-                      }`}
-                    >
-                      {currentUser.fullName}
-                    </div>
-                    <div
-                      className={`text-[11px] truncate ${
-                        isDarkSidebar ? 'text-emerald-300/70' : 'text-[#64748B]'
-                      }`}
-                    >
-                      {currentUser.role.replace('_', ' ')}
-                    </div>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={logout}
-                  title="Sign out to Login screen"
-                  aria-label="Sign out to Login screen"
-                  className={`p-1.5 rounded-lg transition-colors ${
-                    isDarkSidebar
-                      ? 'text-emerald-300/70 hover:text-white hover:bg-emerald-900/50'
-                      : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
-                  }`}
-                >
-                  <LogOut className="w-4 h-4" />
-                </button>
+          <div className="flex items-center gap-2.5 px-2 py-1 overflow-hidden">
+            <Avatar
+              initials={currentUser.avatarInitials}
+              size="sm"
+              variant="emerald"
+            />
+            <div className={`min-w-0 ${fade}`}>
+              <div
+                className={`text-xs font-semibold truncate whitespace-nowrap ${
+                  isDarkSidebar ? "text-white" : "text-[#111827]"
+                }`}
+              >
+                {currentUser.fullName}
+              </div>
+              <div
+                className={`text-[11px] truncate whitespace-nowrap ${
+                  isDarkSidebar ? "text-emerald-300/70" : "text-[#64748B]"
+                }`}
+              >
+                {currentUser.role.replace("_", " ")}
               </div>
             </div>
-          ) : (
-            <div className="flex flex-col items-center gap-2">
-              <Avatar initials={currentUser.avatarInitials} size="sm" variant="emerald" />
-              <button
-                type="button"
-                onClick={logout}
-                title="Sign out"
-                aria-label="Sign out"
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
-            </div>
-          )}
+          </div>
+
+          <button
+            type="button"
+            onClick={logout}
+            title="Sign out"
+            aria-label="Sign out"
+            className={`w-full flex items-center gap-2.5 px-4 py-2 rounded-lg overflow-hidden text-xs font-medium transition-colors ${
+              isDarkSidebar
+                ? "text-emerald-300/80 hover:text-white hover:bg-emerald-900/50"
+                : "text-slate-500 hover:text-slate-800 hover:bg-slate-100"
+            }`}
+          >
+            <LogOut className="w-4 h-4 shrink-0" />
+            <span className={`whitespace-nowrap ${fade}`}>Sign out</span>
+          </button>
         </div>
       </div>
     );
@@ -623,16 +675,32 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen flex bg-[#F8FAFC] text-[#111827]">
       {/* Desktop Left Sidebar */}
       <aside
-        className={`hidden lg:block shrink-0 transition-all duration-150 ${
-          sidebarCollapsed ? 'w-[72px]' : 'w-[260px]'
+        className={`hidden lg:block shrink-0 transition-[width] duration-300 ease-in-out ${
+          sidebarCollapsed ? "w-[72px]" : "w-[260px]"
         }`}
       >
         <div
-          className={`fixed top-0 left-0 bottom-0 z-30 transition-all duration-150 ${
-            sidebarCollapsed ? 'w-[72px]' : 'w-[260px]'
+          className={`fixed top-0 left-0 bottom-0 z-30 transition-[width] duration-300 ease-in-out ${
+            sidebarCollapsed ? "w-[72px]" : "w-[260px]"
           }`}
         >
           {renderSidebarContent(false)}
+
+          <button
+            type="button"
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            aria-label={
+              sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"
+            }
+            title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            className="absolute top-5 -right-3 z-40 w-6 h-6 rounded-full bg-white border border-[#E2E8F0] shadow-sm flex items-center justify-center text-slate-500 hover:text-[#047857] hover:border-[#10B981] transition-colors"
+          >
+            <ChevronLeft
+              className={`w-3.5 h-3.5 transition-transform duration-300 ${
+                sidebarCollapsed ? "rotate-180" : ""
+              }`}
+            />
+          </button>
         </div>
       </aside>
 
@@ -664,11 +732,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Menu className="w-5 h-5" />
             </button>
 
-            <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs min-w-0">
+            <nav
+              aria-label="Breadcrumb"
+              className="flex items-center gap-2 text-xs min-w-0"
+            >
               <span className="text-[#64748B] font-medium hidden sm:inline whitespace-nowrap">
                 {currentBreadcrumb.section}
               </span>
-              <span className="text-slate-300 hidden sm:inline" aria-hidden="true">
+              <span
+                className="text-slate-300 hidden sm:inline"
+                aria-hidden="true"
+              >
                 /
               </span>
               <span className="font-semibold text-[#111827] truncate whitespace-nowrap">
@@ -686,7 +760,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             >
               <span className="flex items-center gap-2 truncate">
                 <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                <span className="truncate">Search tickets (HD-1001), customers, or settings...</span>
+                <span className="truncate">
+                  Search tickets (HD-1001), customers, or settings...
+                </span>
               </span>
               <kbd className="px-1.5 py-0.5 text-[10px] font-mono font-medium text-slate-500 bg-white border border-slate-200 rounded shrink-0">
                 ⌘K
@@ -722,13 +798,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               onClick={toggleSidebarStyle}
               aria-label="Toggle dark emerald sidebar theme"
               title={
-                sidebarStyle === 'light'
-                  ? 'Switch to Dark Emerald (#102A23) Sidebar'
-                  : 'Switch to Crisp White Sidebar'
+                sidebarStyle === "light"
+                  ? "Switch to Dark Emerald (#102A23) Sidebar"
+                  : "Switch to Crisp White Sidebar"
               }
               className="p-2 text-slate-500 hover:text-[#047857] hover:bg-[#F0FDF4] rounded-lg transition-colors"
             >
-              {sidebarStyle === 'light' ? (
+              {sidebarStyle === "light" ? (
                 <PanelLeftClose className="w-4 h-4" />
               ) : (
                 <PanelLeftOpen className="w-4 h-4 text-[#047857]" />
@@ -772,7 +848,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         type="button"
                         onClick={() => {
                           setNotifPopoverOpen(false);
-                          navigateTo('notifications');
+                          navigateTo("notifications");
                         }}
                         className="text-[11px] font-medium text-slate-600 hover:text-slate-900"
                       >
@@ -788,10 +864,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         onClick={() => {
                           markNotificationRead(n.id);
                           setNotifPopoverOpen(false);
-                          navigateTo('ticket-detail', { ticketId: n.ticketId });
+                          navigateTo("ticket-detail", { ticketId: n.ticketId });
                         }}
                         className={`w-full text-left px-4 py-3 hover:bg-[#F0FDF4] transition-colors ${
-                          !n.read ? 'bg-[#ECFDF5]/40' : 'bg-white'
+                          !n.read ? "bg-[#ECFDF5]/40" : "bg-white"
                         }`}
                       >
                         <div className="flex items-center justify-between gap-2">
@@ -802,7 +878,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                             {n.createdAt}
                           </span>
                         </div>
-                        <p className="text-xs text-[#64748B] mt-1 line-clamp-2">{n.description}</p>
+                        <p className="text-xs text-[#64748B] mt-1 line-clamp-2">
+                          {n.description}
+                        </p>
                       </button>
                     ))}
                   </div>
@@ -831,7 +909,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 aria-label="Account and Role Switcher menu"
                 className="flex items-center gap-2 pl-1.5 pr-2 py-1 rounded-lg hover:bg-slate-100 transition-colors"
               >
-                <Avatar initials={currentUser.avatarInitials} size="sm" variant="emerald" />
+                <Avatar
+                  initials={currentUser.avatarInitials}
+                  size="sm"
+                  variant="emerald"
+                />
                 <ChevronDown className="w-3.5 h-3.5 text-slate-500 hidden sm:block" />
               </button>
 
@@ -841,9 +923,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     <div className="text-xs font-semibold text-[#111827]">
                       {currentUser.fullName}
                     </div>
-                    <div className="text-[11px] text-[#64748B] truncate">{currentUser.email}</div>
+                    <div className="text-[11px] text-[#64748B] truncate">
+                      {currentUser.email}
+                    </div>
                     <div className="text-[11px] font-medium text-[#047857] mt-1">
-                      Active Role: {currentUser.role.replace('_', ' ')}
+                      Active Role: {currentUser.role.replace("_", " ")}
                     </div>
                   </div>
 
@@ -853,29 +937,29 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   {(
                     [
                       {
-                        role: 'COMPANY_ADMIN',
-                        label: 'Alex Morgan — Company Admin',
-                        sub: 'Full workspace, analytics & settings',
+                        role: "COMPANY_ADMIN",
+                        label: "Alex Morgan — Company Admin",
+                        sub: "Full workspace, analytics & settings",
                       },
                       {
-                        role: 'SUPPORT_MANAGER',
-                        label: 'Priya Patel — Support Manager',
-                        sub: 'Team management, SLA & reports',
+                        role: "SUPPORT_MANAGER",
+                        label: "Priya Patel — Support Manager",
+                        sub: "Team management, SLA & reports",
                       },
                       {
-                        role: 'SUPPORT_AGENT',
-                        label: 'Sarah Jenkins — Support Agent',
-                        sub: 'Assigned tickets & priority queue',
+                        role: "SUPPORT_AGENT",
+                        label: "Sarah Jenkins — Support Agent",
+                        sub: "Assigned tickets & priority queue",
                       },
                       {
-                        role: 'CUSTOMER',
-                        label: 'Elena Rostova — Customer Portal',
-                        sub: 'Simplified portal (no internal notes)',
+                        role: "CUSTOMER",
+                        label: "Elena Rostova — Customer Portal",
+                        sub: "Simplified portal (no internal notes)",
                       },
                       {
-                        role: 'PLATFORM_ADMIN',
-                        label: 'Marcus Vance — Platform Admin',
-                        sub: 'Multi-tenant organizations & billing',
+                        role: "PLATFORM_ADMIN",
+                        label: "Marcus Vance — Platform Admin",
+                        sub: "Multi-tenant organizations & billing",
                       },
                     ] as const
                   ).map((p) => (
@@ -888,12 +972,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       }}
                       className={`w-full text-left px-4 py-2 text-xs hover:bg-[#F0FDF4] transition-colors ${
                         currentUser.role === p.role
-                          ? 'bg-[#ECFDF5] text-[#047857] font-semibold'
-                          : 'text-slate-700'
+                          ? "bg-[#ECFDF5] text-[#047857] font-semibold"
+                          : "text-slate-700"
                       }`}
                     >
                       <div>{p.label}</div>
-                      <div className="text-[11px] text-[#64748B] font-normal">{p.sub}</div>
+                      <div className="text-[11px] text-[#64748B] font-normal">
+                        {p.sub}
+                      </div>
                     </button>
                   ))}
 
@@ -904,7 +990,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     type="button"
                     onClick={() => {
                       setUserMenuOpen(false);
-                      navigateTo('login');
+                      navigateTo("login");
                     }}
                     className="w-full flex items-center gap-2 px-4 py-2 text-xs text-slate-700 hover:bg-slate-50"
                   >
@@ -915,7 +1001,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     type="button"
                     onClick={() => {
                       setUserMenuOpen(false);
-                      navigateTo('register');
+                      navigateTo("register");
                     }}
                     className="w-full flex items-center gap-2 px-4 py-2 text-xs text-slate-700 hover:bg-slate-50"
                   >
@@ -926,7 +1012,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     type="button"
                     onClick={() => {
                       setUserMenuOpen(false);
-                      navigateTo('forgot-password');
+                      navigateTo("forgot-password");
                     }}
                     className="w-full flex items-center gap-2 px-4 py-2 text-xs text-slate-700 hover:bg-slate-50"
                   >
@@ -945,10 +1031,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <span className="font-semibold">Perspective Switcher:</span>
             {(
               [
-                { role: 'COMPANY_ADMIN', label: 'Admin / Manager' },
-                { role: 'SUPPORT_AGENT', label: 'Support Agent' },
-                { role: 'CUSTOMER', label: 'Customer Portal' },
-                { role: 'PLATFORM_ADMIN', label: 'Platform Admin' },
+                { role: "COMPANY_ADMIN", label: "Admin / Manager" },
+                { role: "SUPPORT_AGENT", label: "Support Agent" },
+                { role: "CUSTOMER", label: "Customer Portal" },
+                { role: "PLATFORM_ADMIN", label: "Platform Admin" },
               ] as const
             ).map((r) => (
               <button
@@ -957,8 +1043,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 onClick={() => switchRolePersona(r.role)}
                 className={`px-2.5 py-1 rounded-md font-medium transition-colors whitespace-nowrap ${
                   currentUser.role === r.role
-                    ? 'bg-[#047857] text-white shadow-2xs'
-                    : 'bg-white/80 text-[#047857] hover:bg-white border border-[#10B981]/30'
+                    ? "bg-[#047857] text-white shadow-2xs"
+                    : "bg-white/80 text-[#047857] hover:bg-white border border-[#10B981]/30"
                 }`}
               >
                 {r.label}
@@ -967,7 +1053,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <span className="text-slate-300 hidden sm:inline">·</span>
             <button
               type="button"
-              onClick={() => navigateTo('landing')}
+              onClick={() => navigateTo("landing")}
               className="text-[#047857] hover:underline font-medium whitespace-nowrap"
             >
               Landing Page
@@ -975,7 +1061,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <span className="text-slate-300 hidden sm:inline">·</span>
             <button
               type="button"
-              onClick={() => navigateTo('login')}
+              onClick={() => navigateTo("login")}
               className="text-[#047857] hover:underline font-medium whitespace-nowrap"
             >
               Login Screen
@@ -987,25 +1073,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               Data Source: Development API Adapter (Spring Boot Ready)
             </span>
             <div className="flex items-center gap-1 bg-white border border-[#E2E8F0] rounded-lg p-0.5">
-              {(['NORMAL', 'LOADING', 'EMPTY', 'ERROR'] as SimulationState[]).map((st) => (
+              {(
+                ["NORMAL", "LOADING", "EMPTY", "ERROR"] as SimulationState[]
+              ).map((st) => (
                 <button
                   key={st}
                   type="button"
                   onClick={() => setSimulationState(st)}
                   className={`px-2 py-0.5 text-[11px] font-medium rounded transition-colors ${
                     simulationState === st
-                      ? 'bg-[#047857] text-white'
-                      : 'text-slate-600 hover:text-slate-900'
+                      ? "bg-[#047857] text-white"
+                      : "text-slate-600 hover:text-slate-900"
                   }`}
                   title={`Simulate ${st.toLowerCase()} state across views`}
                 >
-                  {st === 'NORMAL'
-                    ? 'Live Demo'
-                    : st === 'LOADING'
-                    ? 'Skeleton'
-                    : st === 'EMPTY'
-                    ? 'Empty'
-                    : 'Error'}
+                  {st === "NORMAL"
+                    ? "Live Demo"
+                    : st === "LOADING"
+                      ? "Skeleton"
+                      : st === "EMPTY"
+                        ? "Empty"
+                        : "Error"}
                 </button>
               ))}
             </div>
@@ -1051,7 +1139,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     type="button"
                     onClick={() => {
                       setSearchModalOpen(false);
-                      navigateTo('ticket-detail', { ticketId: t.id });
+                      navigateTo("ticket-detail", { ticketId: t.id });
                     }}
                     className="w-full flex items-center justify-between gap-3 px-3.5 py-2.5 text-left hover:bg-[#F0FDF4] transition-colors"
                   >
@@ -1069,14 +1157,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       </div>
                     </div>
                     <span className="text-[11px] font-mono text-slate-500 shrink-0">
-                      {t.status.replace(/_/g, ' ')}
+                      {t.status.replace(/_/g, " ")}
                     </span>
                   </button>
                 ))}
               </div>
             </div>
 
-            {currentUser.role !== 'CUSTOMER' && (
+            {currentUser.role !== "CUSTOMER" && (
               <div>
                 <div className="text-[11px] font-semibold uppercase tracking-wider text-[#64748B] mb-1.5">
                   Customers
@@ -1088,12 +1176,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       type="button"
                       onClick={() => {
                         setSearchModalOpen(false);
-                        navigateTo('customers', { customerId: c.id });
+                        navigateTo("customers", { customerId: c.id });
                       }}
                       className="w-full flex items-center justify-between gap-3 px-3.5 py-2 text-left hover:bg-[#F0FDF4] transition-colors"
                     >
                       <div>
-                        <div className="text-xs font-semibold text-[#111827]">{c.fullName}</div>
+                        <div className="text-xs font-semibold text-[#111827]">
+                          {c.fullName}
+                        </div>
                         <div className="text-[11px] text-[#64748B]">
                           {c.organization} · {c.email}
                         </div>
@@ -1124,15 +1214,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               Clean Separation of Mock Adapter vs. Live Spring Boot REST API
             </div>
             <p className="leading-relaxed">
-              HelpDesk Pro is architected with a modular TypeScript service layer (
-              <code className="font-mono bg-white/80 px-1.5 py-0.5 rounded">/services/api.ts</code>)
-              designed for a Java 21 Spring Boot 3.x REST backend. When{' '}
+              HelpDesk Pro is architected with a modular TypeScript service
+              layer (
+              <code className="font-mono bg-white/80 px-1.5 py-0.5 rounded">
+                /services/api.ts
+              </code>
+              ) designed for a Java 21 Spring Boot 3.x REST backend. When{" "}
               <code className="font-mono bg-white/80 px-1.5 py-0.5 rounded">
                 NEXT_PUBLIC_USE_MOCK_API=false
-              </code>{' '}
-              is set, requests route directly to the Spring Boot controllers below with JWT Bearer
-              authentication and multi-tenant <code className="font-mono">X-Organization-Id</code>{' '}
-              headers.
+              </code>{" "}
+              is set, requests route directly to the Spring Boot controllers
+              below with JWT Bearer authentication and multi-tenant{" "}
+              <code className="font-mono">X-Organization-Id</code> headers.
             </p>
           </div>
 
@@ -1150,16 +1243,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     <div className="flex items-center gap-2">
                       <span
                         className={`font-mono font-bold text-[10px] px-1.5 py-0.5 rounded ${
-                          ep.method === 'GET'
-                            ? 'bg-blue-50 text-blue-700'
-                            : ep.method === 'POST'
-                            ? 'bg-emerald-50 text-emerald-700'
-                            : 'bg-amber-50 text-amber-800'
+                          ep.method === "GET"
+                            ? "bg-blue-50 text-blue-700"
+                            : ep.method === "POST"
+                              ? "bg-emerald-50 text-emerald-700"
+                              : "bg-amber-50 text-amber-800"
                         }`}
                       >
                         {ep.method}
                       </span>
-                      <span className="font-mono font-semibold text-[#111827]">{ep.path}</span>
+                      <span className="font-mono font-semibold text-[#111827]">
+                        {ep.path}
+                      </span>
                     </div>
                     <p className="text-[#64748B]">{ep.description}</p>
                   </div>
@@ -1173,7 +1268,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="border border-[#E2E8F0] rounded-xl p-4 bg-[#F8FAFC]">
-              <h5 className="font-semibold text-[#111827] mb-1.5">Development & Startup</h5>
+              <h5 className="font-semibold text-[#111827] mb-1.5">
+                Development & Startup
+              </h5>
               <pre className="font-mono text-[11px] text-slate-700 space-y-1 overflow-x-auto">
                 {`# 1. Install packages
 npm install
@@ -1186,7 +1283,9 @@ npm run build && npm run start`}
               </pre>
             </div>
             <div className="border border-[#E2E8F0] rounded-xl p-4 bg-[#F8FAFC]">
-              <h5 className="font-semibold text-[#111827] mb-1.5">Environment Configuration</h5>
+              <h5 className="font-semibold text-[#111827] mb-1.5">
+                Environment Configuration
+              </h5>
               <pre className="font-mono text-[11px] text-slate-700 space-y-1 overflow-x-auto">
                 {`# .env.local
 NEXT_PUBLIC_API_BASE_URL="http://localhost:8080/api/v1"
