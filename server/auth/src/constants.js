@@ -1,1 +1,1 @@
-export const DB_NAME = "auth"
+export const DB_NAME = "help_dask_auth";
