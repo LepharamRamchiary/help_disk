@@ -4,7 +4,6 @@ import "dotenv/config";
 import authRoutes from "./routes/auth.routes.js";
 
 const app = express();
-const scrypt = promisify(scryptCallback);
 
 app.use(cors());
 
