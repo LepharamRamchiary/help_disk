@@ -144,8 +144,16 @@ async function requestWithFallback<T>(
 
 export const HelpDeskApiService = {
   auth: {
-    login: async (email: string) =>
-      requestWithFallback('/auth/login', { method: 'POST', body: JSON.stringify({ email }) }, () => ({
+    login: async (email: string, password: string) =>
+      requestWithFallback('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }, () => ({
+        success: true,
+        message: 'Login successful',
+        data: {
+          token: 'mock-token',
+          tokenType: 'Bearer',
+          expiresIn: 3600,
+          user: { email },
+        },
         token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.helpdesk-pro-demo',
         authenticatedAt: new Date().toISOString(),
       })),
