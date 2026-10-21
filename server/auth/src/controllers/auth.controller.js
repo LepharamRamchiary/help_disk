@@ -163,4 +163,8 @@ const login = async (req, res) => {
   });
 };
 
+// logout controllers
+const logout = async (req, res) => {
+  // this is the simple controller
+}
 export { login, register };
