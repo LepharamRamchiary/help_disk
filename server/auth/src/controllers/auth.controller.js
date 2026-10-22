@@ -163,8 +163,11 @@ const login = async (req, res) => {
   });
 };
 
-// logout controllers
 const logout = async (req, res) => {
-  // this is the simple controller
-}
-export { login, register };
+  return res.status(200).json({
+    success: true,
+    message: "Logout successful. Remove the bearer token from the client.",
+  });
+};
+
+export { login, logout, register };
