@@ -163,6 +163,97 @@ const login = async (req, res) => {
   });
 };
 
+const getMe = async (req, res) => {
+  const authorization = req.headers.authorization;
+  const [scheme, token, extra] =
+    typeof authorization === "string" ? authorization.split(" ") : [];
+
+  if (scheme !== "Bearer" || !token || extra) {
+    return res.status(401).json({
+      success: false,
+      message: "A valid bearer token is required",
+    });
+  }
+
+  const secret = process.env.AUTH_JWT_SECRET;
+  if (!secret || Buffer.byteLength(secret) < 32) {
+    throw new Error("AUTH_JWT_SECRET must be configured with at least 32 bytes");
+  }
+
+  const [headerSegment, payloadSegment, signatureSegment, extraSegment] =
+    token.split(".");
+
+  if (
+    !headerSegment ||
+    !payloadSegment ||
+    !signatureSegment ||
+    extraSegment ||
+    !/^[A-Za-z0-9_-]+$/.test(headerSegment) ||
+    !/^[A-Za-z0-9_-]+$/.test(payloadSegment) ||
+    !/^[A-Za-z0-9_-]+$/.test(signatureSegment)
+  ) {
+    return res.status(401).json({
+      success: false,
+      message: "Invalid or expired token",
+    });
+  }
+
+  let header;
+  let payload;
+  try {
+    header = JSON.parse(Buffer.from(headerSegment, "base64url").toString());
+    payload = JSON.parse(Buffer.from(payloadSegment, "base64url").toString());
+  } catch {
+    return res.status(401).json({
+      success: false,
+      message: "Invalid or expired token",
+    });
+  }
+
+  const unsignedToken = `${headerSegment}.${payloadSegment}`;
+  const expectedSignature = createHmac("sha256", secret)
+    .update(unsignedToken)
+    .digest();
+  const suppliedSignature = Buffer.from(signatureSegment, "base64url");
+  const validToken =
+    header?.alg === "HS256" &&
+    header?.typ === "JWT" &&
+    payload?.iss === "help-dask-auth" &&
+    typeof payload?.sub === "string" &&
+    /^[1-9]\d*$/.test(payload.sub) &&
+    Number.isSafeInteger(Number(payload.sub)) &&
+    Number.isInteger(payload?.exp) &&
+    payload.exp > Math.floor(Date.now() / 1000) &&
+    suppliedSignature.length === expectedSignature.length &&
+    timingSafeEqual(expectedSignature, suppliedSignature);
+
+  if (!validToken) {
+    return res.status(401).json({
+      success: false,
+      message: "Invalid or expired token",
+    });
+  }
+
+  const [users] = await pool.execute(
+    "SELECT id, name, email, createdAt FROM users WHERE id = ? LIMIT 1",
+    [Number(payload.sub)],
+  );
+  const user = users[0];
+
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      message: "User not found",
+    });
+  }
+
+  return res.status(200).json({
+    success: true,
+    message: "Profile retrieved successfully",
+    data: user,
+  });
+};
+
 const logout = async (req, res) => {
   return res.status(200).json({
     success: true,
@@ -170,4 +261,4 @@ const logout = async (req, res) => {
   });
 };
 
-export { login, logout, register };
+export { getMe, login, logout, register };
