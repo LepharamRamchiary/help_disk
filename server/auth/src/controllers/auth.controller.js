@@ -10,7 +10,7 @@ import { pool } from "../db/index.js";
 const scrypt = promisify(scryptCallback);
 const tokenLifetimeSeconds = 60 * 60;
 
-const register = async (req, res) => {
+const createUser = async (req, res, message) => {
   const { name, email, password } = req.body ?? {};
   const normalizedName = typeof name === "string" ? name.trim() : "";
   const normalizedEmail =
@@ -61,7 +61,7 @@ const register = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: "User created successfully",
+      message,
       data: users[0],
     });
   } catch (error) {
@@ -75,6 +75,11 @@ const register = async (req, res) => {
     throw error;
   }
 };
+
+const register = (req, res) =>
+  createUser(req, res, "User created successfully");
+
+const addUser = (req, res) => createUser(req, res, "User added successfully");
 
 const login = async (req, res) => {
   const { email, password } = req.body ?? {};
@@ -163,7 +168,7 @@ const login = async (req, res) => {
   });
 };
 
-const getMe = async (req, res) => {
+const authenticate = async (req, res, next) => {
   const authorization = req.headers.authorization;
   const [scheme, token, extra] =
     typeof authorization === "string" ? authorization.split(" ") : [];
@@ -247,10 +252,15 @@ const getMe = async (req, res) => {
     });
   }
 
+  req.authenticatedUser = user;
+  return next();
+};
+
+const getMe = (req, res) => {
   return res.status(200).json({
     success: true,
     message: "Profile retrieved successfully",
-    data: user,
+    data: req.authenticatedUser,
   });
 };
 
@@ -261,4 +271,4 @@ const logout = async (req, res) => {
   });
 };
 
-export { getMe, login, logout, register };
+export { addUser, authenticate, getMe, login, logout, register };
