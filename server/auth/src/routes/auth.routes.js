@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   addUser,
   authenticate,
+  getAllUsers,
   getMe,
   login,
   logout,
@@ -12,6 +13,7 @@ const router = Router();
 
 router.post("/register", register);
 router.post("/users", authenticate, addUser);
+router.get("/users", authenticate, getAllUsers);
 router.post("/login", login);
 router.get("/me", authenticate, getMe);
 router.post("/logout", authenticate, logout);

@@ -264,6 +264,18 @@ const getMe = (req, res) => {
   });
 };
 
+const getAllUsers = async (req, res) => {
+  const [users] = await pool.execute(
+    "SELECT id, name, email, createdAt FROM users ORDER BY id",
+  );
+
+  return res.status(200).json({
+    success: true,
+    message: "Users retrieved successfully",
+    data: users,
+  });
+};
+
 const logout = async (req, res) => {
   return res.status(200).json({
     success: true,
@@ -271,4 +283,4 @@ const logout = async (req, res) => {
   });
 };
 
-export { addUser, authenticate, getMe, login, logout, register };
+export { addUser, authenticate, getAllUsers, getMe, login, logout, register };
