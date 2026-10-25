@@ -240,7 +240,7 @@ const authenticate = async (req, res, next) => {
   }
 
   const [users] = await pool.execute(
-    "SELECT id, name, email, createdAt FROM users WHERE id = ? LIMIT 1",
+    "SELECT id, name, email, createdAt, role FROM users WHERE id = ? LIMIT 1",
     [Number(payload.sub)],
   );
   const user = users[0];
@@ -260,8 +260,24 @@ const getMe = (req, res) => {
   return res.status(200).json({
     success: true,
     message: "Profile retrieved successfully",
-    data: req.authenticatedUser,
+    data: {
+      id: req.authenticatedUser.id,
+      name: req.authenticatedUser.name,
+      email: req.authenticatedUser.email,
+      createdAt: req.authenticatedUser.createdAt,
+    },
   });
+};
+
+const requireAdmin = (req, res, next) => {
+  if (req.authenticatedUser.role !== "ADMIN") {
+    return res.status(403).json({
+      success: false,
+      message: "Administrator access is required",
+    });
+  }
+
+  return next();
 };
 
 const getAllUsers = async (req, res) => {
@@ -276,6 +292,33 @@ const getAllUsers = async (req, res) => {
   });
 };
 
+const deleteUser = async (req, res) => {
+  const { id } = req.params;
+  if (!/^[1-9]\d*$/.test(id) || !Number.isSafeInteger(Number(id))) {
+    return res.status(400).json({
+      success: false,
+      message: "A valid user ID is required",
+    });
+  }
+
+  const [result] = await pool.execute("DELETE FROM users WHERE id = ?", [
+    Number(id),
+  ]);
+
+  if (result.affectedRows === 0) {
+    return res.status(404).json({
+      success: false,
+      message: "User not found",
+    });
+  }
+
+  return res.status(200).json({
+    success: true,
+    message: "User deleted successfully",
+    data: { id: Number(id) },
+  });
+};
+
 const logout = async (req, res) => {
   return res.status(200).json({
     success: true,
@@ -283,4 +326,14 @@ const logout = async (req, res) => {
   });
 };
 
-export { addUser, authenticate, getAllUsers, getMe, login, logout, register };
+export {
+  addUser,
+  authenticate,
+  deleteUser,
+  getAllUsers,
+  getMe,
+  login,
+  logout,
+  register,
+  requireAdmin,
+};
