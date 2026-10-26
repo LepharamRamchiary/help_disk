@@ -18,7 +18,8 @@ services:
       PORT: 8000
       AUTH_SERVICE_URL: http://auth:8001
     depends_on:
-      - auth
+      auth:
+        condition: service_healthy
 
   auth:
     build:
@@ -29,3 +30,15 @@ services:
       - ./server/auth/.env
     environment:
       PORT: 8001
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8001/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
