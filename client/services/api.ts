@@ -14,8 +14,144 @@ import {
 } from '@/types/helpdesk';
 
 export const SPRING_BOOT_API_CONFIG = {
-  baseUrl: process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080/api/v1',
+  baseUrl: process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api/v1',
   useMockAdapter: process.env.NEXT_PUBLIC_USE_MOCK_API !== 'false',
+};
+
+export interface AuthenticatedUser {
+  id: number | string;
+  name: string | null;
+  email: string;
+  role?: string;
+  createdAt?: string;
+}
+
+export interface AuthSession {
+  token: string;
+  tokenType: string;
+  expiresIn: number;
+  user: AuthenticatedUser;
+}
+
+export class AuthApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number
+  ) {
+    super(message);
+    this.name = 'AuthApiError';
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function parseAuthenticatedUser(value: unknown): AuthenticatedUser {
+  if (
+    !isRecord(value) ||
+    (typeof value.id !== 'number' && typeof value.id !== 'string') ||
+    typeof value.email !== 'string' ||
+    (value.name !== null && typeof value.name !== 'string')
+  ) {
+    throw new AuthApiError('The auth service returned an invalid user profile.', 502);
+  }
+
+  return {
+    id: value.id,
+    name: value.name,
+    email: value.email,
+    role: typeof value.role === 'string' ? value.role : undefined,
+    createdAt: typeof value.createdAt === 'string' ? value.createdAt : undefined,
+  };
+}
+
+async function authRequest(path: string, options: RequestInit = {}): Promise<unknown> {
+  let response: Response;
+  try {
+    response = await fetch(
+      `${SPRING_BOOT_API_CONFIG.baseUrl.replace(/\/$/, '')}/auth${path}`,
+      {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(options.headers || {}),
+        },
+      }
+    );
+  } catch {
+    throw new AuthApiError(
+      'Unable to reach the auth service. Check the API URL and make sure the services are running.',
+      0
+    );
+  }
+
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    throw new AuthApiError('The auth service returned an invalid response.', response.status);
+  }
+
+  if (!isRecord(body)) {
+    throw new AuthApiError('The auth service returned an invalid response.', response.status);
+  }
+  if (!response.ok || body.success !== true) {
+    throw new AuthApiError(
+      typeof body.message === 'string' ? body.message : 'Authentication request failed.',
+      response.status
+    );
+  }
+
+  return body.data;
+}
+
+function parseAuthSession(value: unknown): AuthSession {
+  if (
+    !isRecord(value) ||
+    typeof value.token !== 'string' ||
+    typeof value.tokenType !== 'string' ||
+    typeof value.expiresIn !== 'number'
+  ) {
+    throw new AuthApiError('The auth service returned an invalid session.', 502);
+  }
+
+  return {
+    token: value.token,
+    tokenType: value.tokenType,
+    expiresIn: value.expiresIn,
+    user: parseAuthenticatedUser(value.user),
+  };
+}
+
+export const AuthApiService = {
+  login: async (email: string, password: string): Promise<AuthSession> =>
+    parseAuthSession(
+      await authRequest('/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      })
+    ),
+  register: async (name: string, email: string, password: string): Promise<AuthSession> =>
+    parseAuthSession(
+      await authRequest('/register', {
+        method: 'POST',
+        body: JSON.stringify({ name, email, password }),
+      })
+    ),
+  google: async (credential: string): Promise<AuthSession> =>
+    parseAuthSession(
+      await authRequest('/google', {
+        method: 'POST',
+        body: JSON.stringify({ credential }),
+      })
+    ),
+  me: async (token: string): Promise<AuthenticatedUser> =>
+    parseAuthenticatedUser(
+      await authRequest('/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+    ),
 };
 
 export interface ApiEndpointSpec {

@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express from "express";
 import http from "node:http";
 import https from "node:https";
@@ -57,7 +58,13 @@ app.use("/api/v1/auth", (req, res) => {
   );
 
   upstreamRequest.on("error", (error) => {
-    console.error("Auth service proxy failed:", error.message);
+    console.error("Auth service proxy failed:", {
+      message: error.message || String(error),
+      code: error.code,
+      address: error.address,
+      port: error.port,
+      upstream: `${authServiceUrl.origin}${authPath}`,
+    });
 
     if (res.headersSent) {
       res.destroy(error);

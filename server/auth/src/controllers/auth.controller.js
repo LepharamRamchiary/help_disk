@@ -1,16 +1,15 @@
 import {
-  createHmac,
   randomBytes,
   scrypt as scryptCallback,
   timingSafeEqual,
 } from "node:crypto";
 import { promisify } from "node:util";
 import { pool } from "../db/index.js";
+import { issueToken } from "../utils/token.js";
 
 const scrypt = promisify(scryptCallback);
-const tokenLifetimeSeconds = 60 * 60;
 
-const createUser = async (req, res, message) => {
+const createUser = async (req, res, message, createSession = false) => {
   const { name, email, password } = req.body ?? {};
   const normalizedName = typeof name === "string" ? name.trim() : "";
   const normalizedEmail =
@@ -55,14 +54,17 @@ const createUser = async (req, res, message) => {
       [normalizedName, normalizedEmail, passwordHash],
     );
     const [users] = await pool.execute(
-      "SELECT id, name, email, createdAt FROM users WHERE id = ?",
+      "SELECT id, name, email, role, createdAt FROM users WHERE id = ?",
       [result.insertId],
     );
+    const user = users[0];
 
     return res.status(201).json({
       success: true,
       message,
-      data: users[0],
+      data: createSession
+        ? { ...issueToken(user), user }
+        : user,
     });
   } catch (error) {
     if (error.code === "ER_DUP_ENTRY") {
@@ -77,7 +79,7 @@ const createUser = async (req, res, message) => {
 };
 
 const register = (req, res) =>
-  createUser(req, res, "User created successfully");
+  createUser(req, res, "User created successfully", true);
 
 const addUser = (req, res) => createUser(req, res, "User added successfully");
 
@@ -108,7 +110,7 @@ const login = async (req, res) => {
   }
 
   const [users] = await pool.execute(
-    "SELECT id, name, email, passwordHash, createdAt FROM users WHERE email = ? LIMIT 1",
+    "SELECT id, name, email, role, passwordHash, createdAt FROM users WHERE email = ? LIMIT 1",
     [normalizedEmail],
   );
   const user = users[0];
@@ -129,39 +131,16 @@ const login = async (req, res) => {
     });
   }
 
-  const secret = process.env.AUTH_JWT_SECRET;
-  if (!secret || Buffer.byteLength(secret) < 32) {
-    throw new Error("AUTH_JWT_SECRET must be configured with at least 32 bytes");
-  }
-
-  const issuedAt = Math.floor(Date.now() / 1000);
-  const encode = (value) =>
-    Buffer.from(JSON.stringify(value)).toString("base64url");
-  const header = encode({ alg: "HS256", typ: "JWT" });
-  const payload = encode({
-    sub: String(user.id),
-    email: user.email,
-    name: user.name,
-    iss: "help-dask-auth",
-    iat: issuedAt,
-    exp: issuedAt + tokenLifetimeSeconds,
-  });
-  const unsignedToken = `${header}.${payload}`;
-  const signature = createHmac("sha256", secret)
-    .update(unsignedToken)
-    .digest("base64url");
-
   return res.status(200).json({
     success: true,
     message: "Login successful",
     data: {
-      token: `${unsignedToken}.${signature}`,
-      tokenType: "Bearer",
-      expiresIn: tokenLifetimeSeconds,
+      ...issueToken(user),
       user: {
         id: user.id,
         name: user.name,
         email: user.email,
+        role: user.role,
         createdAt: user.createdAt,
       },
     },
@@ -264,6 +243,7 @@ const getMe = (req, res) => {
       id: req.authenticatedUser.id,
       name: req.authenticatedUser.name,
       email: req.authenticatedUser.email,
+      role: req.authenticatedUser.role,
       createdAt: req.authenticatedUser.createdAt,
     },
   });

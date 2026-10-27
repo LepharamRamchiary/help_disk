@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 
 export function LandingPageView() {
-  const { navigateTo, loginWithEmail, addToast } = useHelpDesk();
+  const { navigateTo, addToast } = useHelpDesk();
   const [workEmail, setWorkEmail] = useState('');
   const [emailError, setEmailError] = useState<string | null>(null);
 
@@ -134,10 +134,10 @@ export function LandingPageView() {
 
                   <button
                     type="button"
-                    onClick={() => loginWithEmail('alex.morgan@acmecloud.io', 'COMPANY_ADMIN')}
+                    onClick={() => navigateTo('register')}
                     className="inline-flex items-center gap-2 px-5 py-3 text-sm font-semibold text-[#047857] bg-[#ECFDF5] hover:bg-[#10B981]/20 border border-[#10B981]/30 rounded-xl transition-colors whitespace-nowrap shrink-0"
                   >
-                    <span>Instant 1-Click Live Preview</span>
+                    <span>Create an Account</span>
                   </button>
                 </div>
 
