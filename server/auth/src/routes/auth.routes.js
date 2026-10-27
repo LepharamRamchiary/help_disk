@@ -10,8 +10,11 @@ import {
   register,
   requireAdmin,
 } from "../controllers/auth.controller.js";
+import { googleAuth } from "../controllers/google.controller.js";
 
 const router = Router();
+
+router.post("/google", googleAuth);
 
 router.post("/register", register);
 router.post("/users", authenticate, addUser);
