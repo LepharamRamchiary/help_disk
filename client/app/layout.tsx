@@ -1,5 +1,6 @@
 import type {Metadata} from 'next';
 import {Plus_Jakarta_Sans, JetBrains_Mono} from 'next/font/google';
+import Providers from './providers';
 import './globals.css';
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -45,9 +46,8 @@ export default function RootLayout({children}: {children: React.ReactNode}) {
         suppressHydrationWarning
         className="bg-[#F8FAFC] text-[#111827] antialiased selection:bg-[#ECFDF5] selection:text-[#047857]"
       >
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
 }
-

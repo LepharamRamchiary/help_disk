@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useHelpDesk } from '@/context/HelpDeskContext';
+import GoogleAuthButton from '@/components/google-provider/GoogleAuthButton';
 import {
   Headset,
   Eye,
@@ -12,7 +13,6 @@ import {
   Clock,
   Lock,
   Mail,
-  Building2,
   User,
   AlertCircle,
   ArrowLeft,
@@ -20,26 +20,33 @@ import {
 } from 'lucide-react';
 
 export function AuthViews() {
-  const { currentView, navigateTo, loginWithEmail, addToast } = useHelpDesk();
+  const {
+    currentView,
+    navigateTo,
+    loginWithPassword,
+    registerAccount,
+    loginWithGoogle,
+    addToast,
+  } = useHelpDesk();
 
   // Login State
-  const [loginEmail, setLoginEmail] = useState('alex.morgan@acmecloud.io');
-  const [loginPassword, setLoginPassword] = useState('EnterpriseSupport#2026');
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [loginLoading, setLoginLoading] = useState(false);
 
   // Registration State
-  const [onboardingMode, setOnboardingMode] = useState<'create-org' | 'join-org'>('create-org');
   const [regName, setRegName] = useState('');
   const [regEmail, setRegEmail] = useState('');
-  const [regCompany, setRegCompany] = useState('');
-  const [regInviteCode, setRegInviteCode] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regConfirmPassword, setRegConfirmPassword] = useState('');
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [regError, setRegError] = useState<string | null>(null);
+  const [regLoading, setRegLoading] = useState(false);
+  const [googleError, setGoogleError] = useState<string | null>(null);
 
   // Forgot Password State
   const [resetEmail, setResetEmail] = useState('');
@@ -55,18 +62,29 @@ export function AuthViews() {
     return () => clearInterval(timer);
   }, [cooldownSeconds]);
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError(null);
-    if (!loginEmail.trim() || !loginEmail.includes('@')) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginEmail.trim())) {
       setLoginError('Please enter a valid work email address.');
       return;
     }
-    if (loginPassword.length < 6) {
-      setLoginError('Password must be at least 6 characters.');
+    if (!loginPassword) {
+      setLoginError('Please enter your password.');
       return;
     }
-    loginWithEmail(loginEmail.trim());
+    if (loginPassword.length > 128) {
+      setLoginError('Password must be 128 characters or fewer.');
+      return;
+    }
+    setLoginLoading(true);
+    try {
+      await loginWithPassword(loginEmail.trim(), loginPassword, rememberMe);
+    } catch (error) {
+      setLoginError(error instanceof Error ? error.message : 'Sign-in failed. Please try again.');
+    } finally {
+      setLoginLoading(false);
+    }
   };
 
   // Password strength calculation
@@ -80,23 +98,23 @@ export function AuthViews() {
     (pwdChecks.uppercase ? 1 : 0) +
     (pwdChecks.numberOrSymbol ? 1 : 0);
 
-  const handleRegisterSubmit = (e: React.FormEvent) => {
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setRegError(null);
     if (!regName.trim()) {
       setRegError('Full name is required.');
       return;
     }
-    if (!regEmail.trim() || !regEmail.includes('@')) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(regEmail.trim())) {
       setRegError('Please provide a valid work email address.');
       return;
     }
-    if (onboardingMode === 'create-org' && !regCompany.trim()) {
-      setRegError('Organization name is required to provision a new workspace.');
+    if (regName.trim().length > 100) {
+      setRegError('Name must be 100 characters or fewer.');
       return;
     }
-    if (onboardingMode === 'join-org' && !regInviteCode.trim()) {
-      setRegError('Please enter your organization workspace domain or invitation code.');
+    if (regPassword.length > 128) {
+      setRegError('Password must be 128 characters or fewer.');
       return;
     }
     if (pwdStrengthCount < 3) {
@@ -112,13 +130,23 @@ export function AuthViews() {
       return;
     }
 
-    addToast(
-      onboardingMode === 'create-org'
-        ? `Workspace "${regCompany}" Provisioned`
-        : 'Joined Organization Workspace',
-      `Welcome to HelpDesk Pro, ${regName}.`
-    );
-    loginWithEmail(regEmail.trim(), onboardingMode === 'create-org' ? 'COMPANY_ADMIN' : 'SUPPORT_AGENT');
+    setRegLoading(true);
+    try {
+      await registerAccount(regName.trim(), regEmail.trim(), regPassword);
+    } catch (error) {
+      setRegError(error instanceof Error ? error.message : 'Registration failed. Please try again.');
+    } finally {
+      setRegLoading(false);
+    }
+  };
+
+  const handleGoogleCredential = async (credential: string) => {
+    setGoogleError(null);
+    try {
+      await loginWithGoogle(credential);
+    } catch (error) {
+      setGoogleError(error instanceof Error ? error.message : 'Google sign-in failed.');
+    }
   };
 
   const handleForgotSubmit = (e: React.FormEvent) => {
@@ -309,6 +337,7 @@ export function AuthViews() {
                       type="email"
                       required
                       value={loginEmail}
+                      maxLength={191}
                       onChange={(e) => setLoginEmail(e.target.value)}
                       placeholder="name@company.com"
                       className="w-full pl-10 pr-3.5 py-2 text-sm bg-white border border-[#E2E8F0] rounded-lg focus:outline-none focus:border-[#047857]"
@@ -339,6 +368,7 @@ export function AuthViews() {
                       type={showLoginPassword ? 'text' : 'password'}
                       required
                       value={loginPassword}
+                      maxLength={128}
                       onChange={(e) => setLoginPassword(e.target.value)}
                       className="w-full pl-10 pr-10 py-2 text-sm bg-white border border-[#E2E8F0] rounded-lg focus:outline-none focus:border-[#047857]"
                     />
@@ -365,59 +395,26 @@ export function AuthViews() {
                       onChange={(e) => setRememberMe(e.target.checked)}
                       className="rounded border-slate-300 text-[#047857] focus:ring-[#047857]"
                     />
-                    <span>Remember this device for 30 days</span>
+                    <span>Remember this device</span>
                   </label>
                 </div>
 
                 <button
                   type="submit"
+                  disabled={loginLoading}
                   className="w-full py-2.5 px-4 text-xs font-semibold text-white bg-[#047857] hover:bg-[#065F46] rounded-lg transition-colors flex items-center justify-center gap-2 shadow-2xs"
                 >
-                  <span>Sign In to Workspace</span>
+                  <span>{loginLoading ? 'Signing in…' : 'Sign In to Workspace'}</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </form>
 
-              {/* Instant Demo Role Sign-In Shortcuts */}
-              <div className="pt-4 border-t border-[#E2E8F0]">
-                <div className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider mb-2.5">
-                  One-Click Demo Persona Sign-In
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => loginWithEmail('alex.morgan@acmecloud.io', 'COMPANY_ADMIN')}
-                    className="px-3 py-2 text-left text-xs border border-[#E2E8F0] rounded-lg hover:bg-[#F0FDF4] hover:border-[#10B981]/40 transition-colors"
-                  >
-                    <div className="font-semibold text-[#111827]">Company Admin</div>
-                    <div className="text-[11px] text-[#64748B]">Alex Morgan</div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => loginWithEmail('sarah.jenkins@acmecloud.io', 'SUPPORT_AGENT')}
-                    className="px-3 py-2 text-left text-xs border border-[#E2E8F0] rounded-lg hover:bg-[#F0FDF4] hover:border-[#10B981]/40 transition-colors"
-                  >
-                    <div className="font-semibold text-[#111827]">Support Agent</div>
-                    <div className="text-[11px] text-[#64748B]">Sarah Jenkins</div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => loginWithEmail('elena.rostova@nordicbank.io', 'CUSTOMER')}
-                    className="px-3 py-2 text-left text-xs border border-[#E2E8F0] rounded-lg hover:bg-[#F0FDF4] hover:border-[#10B981]/40 transition-colors"
-                  >
-                    <div className="font-semibold text-[#111827]">Customer Portal</div>
-                    <div className="text-[11px] text-[#64748B]">Elena Rostova</div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => loginWithEmail('marcus.vance@helpdeskpro.io', 'PLATFORM_ADMIN')}
-                    className="px-3 py-2 text-left text-xs border border-[#E2E8F0] rounded-lg hover:bg-[#F0FDF4] hover:border-[#10B981]/40 transition-colors"
-                  >
-                    <div className="font-semibold text-[#111827]">Platform Admin</div>
-                    <div className="text-[11px] text-[#64748B]">Marcus Vance</div>
-                  </button>
-                </div>
-              </div>
+              {googleError && (
+                <p role="alert" className="text-xs text-red-700">
+                  {googleError}
+                </p>
+              )}
+              <GoogleAuthButton onCredential={handleGoogleCredential} onError={setGoogleError} />
 
               <p className="text-center text-xs text-[#64748B]">
                 New to HelpDesk Pro?{' '}
@@ -426,7 +423,7 @@ export function AuthViews() {
                   onClick={() => navigateTo('register')}
                   className="font-semibold text-[#047857] hover:underline"
                 >
-                  Create an organization account
+                  Create an account
                 </button>
               </p>
             </div>
@@ -438,34 +435,8 @@ export function AuthViews() {
               <div>
                 <h2 className="text-xl font-bold text-[#111827]">Get started with HelpDesk Pro</h2>
                 <p className="text-xs text-[#64748B] mt-1">
-                  Launch a new support organization or join your team’s existing workspace.
+                  Create your account with an email and password, or continue with Google.
                 </p>
-              </div>
-
-              {/* SaaS Onboarding Mode Toggle */}
-              <div className="grid grid-cols-2 gap-2 p-1 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg">
-                <button
-                  type="button"
-                  onClick={() => setOnboardingMode('create-org')}
-                  className={`py-2 px-3 text-xs font-medium rounded-md transition-colors ${
-                    onboardingMode === 'create-org'
-                      ? 'bg-[#ECFDF5] text-[#047857] font-semibold border border-[#10B981]/30'
-                      : 'text-[#64748B] hover:text-[#111827]'
-                  }`}
-                >
-                  Create Organization
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setOnboardingMode('join-org')}
-                  className={`py-2 px-3 text-xs font-medium rounded-md transition-colors ${
-                    onboardingMode === 'join-org'
-                      ? 'bg-[#ECFDF5] text-[#047857] font-semibold border border-[#10B981]/30'
-                      : 'text-[#64748B] hover:text-[#111827]'
-                  }`}
-                >
-                  Join Existing Team
-                </button>
               </div>
 
               {regError && (
@@ -493,6 +464,7 @@ export function AuthViews() {
                       type="text"
                       required
                       value={regName}
+                      maxLength={100}
                       onChange={(e) => setRegName(e.target.value)}
                       placeholder="Jordan Taylor"
                       className="w-full pl-10 pr-3.5 py-2 text-sm bg-white border border-[#E2E8F0] rounded-lg focus:outline-none focus:border-[#047857]"
@@ -514,56 +486,13 @@ export function AuthViews() {
                       type="email"
                       required
                       value={regEmail}
+                      maxLength={191}
                       onChange={(e) => setRegEmail(e.target.value)}
                       placeholder="jordan@company.com"
                       className="w-full pl-10 pr-3.5 py-2 text-sm bg-white border border-[#E2E8F0] rounded-lg focus:outline-none focus:border-[#047857]"
                     />
                   </div>
                 </div>
-
-                {onboardingMode === 'create-org' ? (
-                  <div>
-                    <label
-                      htmlFor="reg-company"
-                      className="block text-xs font-semibold text-[#111827] mb-1"
-                    >
-                      Company / Organization Name <span className="text-red-600">*</span>
-                    </label>
-                    <div className="relative">
-                      <Building2 className="w-4 h-4 text-slate-400 absolute left-3.5 top-2.5" />
-                      <input
-                        id="reg-company"
-                        type="text"
-                        required
-                        value={regCompany}
-                        onChange={(e) => setRegCompany(e.target.value)}
-                        placeholder="Acme Cloud Inc."
-                        className="w-full pl-10 pr-3.5 py-2 text-sm bg-white border border-[#E2E8F0] rounded-lg focus:outline-none focus:border-[#047857]"
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div>
-                    <label
-                      htmlFor="reg-invite"
-                      className="block text-xs font-semibold text-[#111827] mb-1"
-                    >
-                      Organization Domain or Invite Token <span className="text-red-600">*</span>
-                    </label>
-                    <div className="relative">
-                      <Building2 className="w-4 h-4 text-slate-400 absolute left-3.5 top-2.5" />
-                      <input
-                        id="reg-invite"
-                        type="text"
-                        required
-                        value={regInviteCode}
-                        onChange={(e) => setRegInviteCode(e.target.value)}
-                        placeholder="e.g. acmecloud.io or INV-9082"
-                        className="w-full pl-10 pr-3.5 py-2 text-sm bg-white border border-[#E2E8F0] rounded-lg focus:outline-none focus:border-[#047857]"
-                      />
-                    </div>
-                  </div>
-                )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
@@ -579,6 +508,7 @@ export function AuthViews() {
                         type={showRegPassword ? 'text' : 'password'}
                         required
                         value={regPassword}
+                        maxLength={128}
                         onChange={(e) => setRegPassword(e.target.value)}
                         placeholder="Create password"
                         className="w-full pl-3.5 pr-9 py-2 text-sm bg-white border border-[#E2E8F0] rounded-lg focus:outline-none focus:border-[#047857]"
@@ -610,6 +540,7 @@ export function AuthViews() {
                       type={showRegPassword ? 'text' : 'password'}
                       required
                       value={regConfirmPassword}
+                      maxLength={128}
                       onChange={(e) => setRegConfirmPassword(e.target.value)}
                       placeholder="Repeat password"
                       className="w-full px-3.5 py-2 text-sm bg-white border border-[#E2E8F0] rounded-lg focus:outline-none focus:border-[#047857]"
@@ -661,13 +592,19 @@ export function AuthViews() {
 
                 <button
                   type="submit"
+                  disabled={regLoading}
                   className="w-full py-2.5 px-4 text-xs font-semibold text-white bg-[#047857] hover:bg-[#065F46] rounded-lg transition-colors"
                 >
-                  {onboardingMode === 'create-org'
-                    ? 'Create Organization Workspace'
-                    : 'Join Organization Workspace'}
+                  {regLoading ? 'Creating account…' : 'Create Account'}
                 </button>
               </form>
+
+              {googleError && (
+                <p role="alert" className="text-xs text-red-700">
+                  {googleError}
+                </p>
+              )}
+              <GoogleAuthButton onCredential={handleGoogleCredential} onError={setGoogleError} />
 
               <p className="text-center text-xs text-[#64748B]">
                 Already have an account?{' '}

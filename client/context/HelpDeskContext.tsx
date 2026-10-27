@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
 import {
   Organization,
   User,
@@ -18,6 +18,7 @@ import {
   ToastMessage,
   Attachment,
 } from '@/types/helpdesk';
+import { AuthApiError, AuthApiService, type AuthenticatedUser } from '@/services/api';
 import {
   INITIAL_ORGANIZATIONS,
   INITIAL_TEAM_MEMBERS,
@@ -31,6 +32,38 @@ import {
 } from '@/lib/mock-data';
 
 export type SimulationState = 'NORMAL' | 'LOADING' | 'EMPTY' | 'ERROR';
+
+const AUTH_TOKEN_KEY = 'helpdesk.auth.token';
+
+function toHelpDeskUser(user: AuthenticatedUser): User {
+  const fullName = user.name?.trim() || user.email.split('@')[0];
+  const role: UserRole =
+    user.role === 'PLATFORM_ADMIN'
+      ? 'PLATFORM_ADMIN'
+      : user.role === 'CUSTOMER'
+        ? 'CUSTOMER'
+        : user.role === 'SUPPORT_MANAGER'
+          ? 'SUPPORT_MANAGER'
+          : user.role === 'ADMIN' || user.role === 'COMPANY_ADMIN'
+            ? 'COMPANY_ADMIN'
+            : 'SUPPORT_AGENT';
+
+  return {
+    ...INITIAL_TEAM_MEMBERS[0],
+    id: String(user.id),
+    fullName,
+    email: user.email,
+    role,
+    title: role.replaceAll('_', ' '),
+    avatarInitials: fullName
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0].toUpperCase())
+      .join(''),
+    joinedAt: user.createdAt || new Date().toISOString(),
+  };
+}
 
 interface CreateTicketInput {
   subject: string;
@@ -50,7 +83,9 @@ interface HelpDeskContextValue {
   navigateTo: (view: PageView, options?: { ticketId?: string; customerId?: string }) => void;
   currentUser: User;
   switchRolePersona: (role: UserRole) => void;
-  loginWithEmail: (email: string, roleOverride?: UserRole) => void;
+  loginWithPassword: (email: string, password: string, rememberMe: boolean) => Promise<void>;
+  registerAccount: (name: string, email: string, password: string) => Promise<void>;
+  loginWithGoogle: (credential: string) => Promise<void>;
   logout: () => void;
 
   // Organization & Theme
@@ -177,6 +212,90 @@ export function HelpDeskProvider({ children }: { children: React.ReactNode }) {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
+  const applyAuthenticatedUser = useCallback((authUser: AuthenticatedUser) => {
+    const user = toHelpDeskUser(authUser);
+    setCurrentUser(user);
+    setCurrentView(
+      user.role === 'CUSTOMER'
+        ? 'customer-portal'
+        : user.role === 'PLATFORM_ADMIN'
+          ? 'platform-admin'
+          : 'overview'
+    );
+  }, []);
+
+  const persistSession = useCallback(
+    (token: string, rememberMe: boolean) => {
+      window.localStorage.removeItem(AUTH_TOKEN_KEY);
+      window.sessionStorage.removeItem(AUTH_TOKEN_KEY);
+      const storage = rememberMe ? window.localStorage : window.sessionStorage;
+      storage.setItem(AUTH_TOKEN_KEY, token);
+    },
+    []
+  );
+
+  const loginWithPassword = useCallback(
+    async (email: string, password: string, rememberMe: boolean) => {
+      const session = await AuthApiService.login(email, password);
+      persistSession(session.token, rememberMe);
+      applyAuthenticatedUser(session.user);
+      addToast('Welcome back to HelpDesk Pro', `Signed in as ${session.user.email}.`);
+    },
+    [addToast, applyAuthenticatedUser, persistSession]
+  );
+
+  const registerAccount = useCallback(
+    async (name: string, email: string, password: string) => {
+      const session = await AuthApiService.register(name, email, password);
+      persistSession(session.token, true);
+      applyAuthenticatedUser(session.user);
+      addToast('Account created', `Welcome to HelpDesk Pro, ${session.user.name || session.user.email}.`);
+    },
+    [addToast, applyAuthenticatedUser, persistSession]
+  );
+
+  const loginWithGoogle = useCallback(
+    async (credential: string) => {
+      const session = await AuthApiService.google(credential);
+      persistSession(session.token, true);
+      applyAuthenticatedUser(session.user);
+      addToast('Google sign-in successful', `Signed in as ${session.user.email}.`);
+    },
+    [addToast, applyAuthenticatedUser, persistSession]
+  );
+
+  useEffect(() => {
+    let active = true;
+    const token =
+      window.localStorage.getItem(AUTH_TOKEN_KEY) ||
+      window.sessionStorage.getItem(AUTH_TOKEN_KEY);
+    if (!token) return;
+
+    AuthApiService.me(token)
+      .then((user) => {
+        if (active) applyAuthenticatedUser(user);
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        if (error instanceof AuthApiError && (error.status === 401 || error.status === 404)) {
+          window.localStorage.removeItem(AUTH_TOKEN_KEY);
+          window.sessionStorage.removeItem(AUTH_TOKEN_KEY);
+          setCurrentView('login');
+          addToast('Session expired', 'Please sign in again to continue.', 'info');
+          return;
+        }
+
+        addToast(
+          'Could not restore your session',
+          error instanceof Error ? error.message : 'Please try signing in again.',
+          'error'
+        );
+      });
+    return () => {
+      active = false;
+    };
+  }, [addToast, applyAuthenticatedUser]);
+
   const navigateTo = useCallback(
     (view: PageView, options?: { ticketId?: string; customerId?: string }) => {
       if (options?.ticketId) {
@@ -229,27 +348,9 @@ export function HelpDeskProvider({ children }: { children: React.ReactNode }) {
     [teamMembers, currentView, addToast]
   );
 
-  const loginWithEmail = useCallback(
-    (email: string, roleOverride?: UserRole) => {
-      const matched =
-        teamMembers.find((u) => u.email.toLowerCase() === email.toLowerCase()) ||
-        (roleOverride ? teamMembers.find((u) => u.role === roleOverride) : undefined) ||
-        teamMembers[0];
-
-      setCurrentUser(matched);
-      if (matched.role === 'CUSTOMER') {
-        setCurrentView('customer-portal');
-      } else if (matched.role === 'PLATFORM_ADMIN') {
-        setCurrentView('platform-admin');
-      } else {
-        setCurrentView('overview');
-      }
-      addToast('Welcome back to HelpDesk Pro', `Authenticated as ${matched.fullName}`);
-    },
-    [teamMembers, addToast]
-  );
-
   const logout = useCallback(() => {
+    window.localStorage.removeItem(AUTH_TOKEN_KEY);
+    window.sessionStorage.removeItem(AUTH_TOKEN_KEY);
     setCurrentView('login');
     addToast('Signed out', 'Your session has been securely closed.', 'info');
   }, [addToast]);
@@ -806,7 +907,9 @@ export function HelpDeskProvider({ children }: { children: React.ReactNode }) {
       navigateTo,
       currentUser,
       switchRolePersona,
-      loginWithEmail,
+      loginWithPassword,
+      registerAccount,
+      loginWithGoogle,
       logout,
       organizations,
       currentOrganization,
@@ -867,7 +970,9 @@ export function HelpDeskProvider({ children }: { children: React.ReactNode }) {
       navigateTo,
       currentUser,
       switchRolePersona,
-      loginWithEmail,
+      loginWithPassword,
+      registerAccount,
+      loginWithGoogle,
       logout,
       organizations,
       currentOrganization,

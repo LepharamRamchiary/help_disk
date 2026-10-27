@@ -1288,7 +1288,8 @@ npm run build && npm run start`}
               </h5>
               <pre className="font-mono text-[11px] text-slate-700 space-y-1 overflow-x-auto">
                 {`# .env.local
-NEXT_PUBLIC_API_BASE_URL="http://localhost:8080/api/v1"
+NEXT_PUBLIC_API_BASE_URL="http://localhost:8000/api/v1"
+NEXT_PUBLIC_GOOGLE_CLIENT_ID="YOUR_GOOGLE_CLIENT_ID"
 NEXT_PUBLIC_USE_MOCK_API="false"`}
               </pre>
             </div>

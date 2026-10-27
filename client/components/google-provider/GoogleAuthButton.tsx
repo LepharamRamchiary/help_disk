@@ -1,29 +1,49 @@
 "use client";
-import { GoogleLogin } from "@react-oauth/google";
-import { useRouter } from "next/navigation";
 
-export default function GoogleAuthButton() {
-  const router = useRouter();
+import { GoogleLogin } from "@react-oauth/google";
+import { useState } from "react";
+
+interface GoogleAuthButtonProps {
+  onCredential: (credential: string) => Promise<void>;
+  onError: (message: string) => void;
+}
+
+export default function GoogleAuthButton({ onCredential, onError }: GoogleAuthButtonProps) {
+  const [processing, setProcessing] = useState(false);
+
+  if (!process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID) {
+    return (
+      <p className="text-center text-xs text-[#64748B]">
+        Google sign-in is unavailable until NEXT_PUBLIC_GOOGLE_CLIENT_ID is configured.
+      </p>
+    );
+  }
 
   return (
-    <GoogleLogin
-      onSuccess={async ({ credential }) => {
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/google`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ credential }),
-          },
-        );
-        const json = await res.json();
-
-        if (!res.ok) return alert(json.message);
-
-        localStorage.setItem("token", json.data.token); // see the note on cookies below
-        router.push("/dashboard");
-      }}
-      onError={() => alert("Google sign-in failed")}
-    />
+    <div className="flex flex-col items-center gap-2" aria-busy={processing}>
+      <div className="w-full border-t border-[#E2E8F0]" />
+      {processing ? (
+        <p role="status" className="text-xs text-[#64748B]">
+          Signing in with Google…
+        </p>
+      ) : (
+        <GoogleLogin
+          text="continue_with"
+          onSuccess={async ({ credential }) => {
+            if (!credential) {
+              onError("Google did not return a sign-in credential. Please try again.");
+              return;
+            }
+            setProcessing(true);
+            try {
+              await onCredential(credential);
+            } finally {
+              setProcessing(false);
+            }
+          }}
+          onError={() => onError("Google sign-in failed. Please try again.")}
+        />
+      )}
+    </div>
   );
 }

@@ -15,6 +15,13 @@ const findUser = async (column, value) => {
 const googleAuth = async (req, res) => {
   const { credential } = req.body ?? {};
 
+  if (!process.env.GOOGLE_CLIENT_ID) {
+    return res.status(503).json({
+      success: false,
+      message: "Google sign-in is not configured",
+    });
+  }
+
   if (
     typeof credential !== "string" ||
     !credential ||
@@ -93,6 +100,7 @@ const googleAuth = async (req, res) => {
         id: user.id,
         name: user.name,
         email: user.email,
+        role: user.role,
         createdAt: user.createdAt,
       },
     },
