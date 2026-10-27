@@ -4,8 +4,14 @@ import http from "node:http";
 import https from "node:https";
 
 const app = express();
+const allowedOrigins = new Set(
+  (process.env.CORS_ALLOWED_ORIGINS)
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+);
 const authServiceUrl = new URL(
-  process.env.AUTH_SERVICE_URL || "http://localhost:5000",
+  process.env.AUTH_SERVICE_URL,
 );
 
 if (!["http:", "https:"].includes(authServiceUrl.protocol)) {
@@ -31,6 +37,27 @@ const getForwardedHeaders = (headers) =>
       ([name]) => !hopByHopHeaders.has(name.toLowerCase()),
     ),
   );
+
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  res.vary("Origin");
+
+  if (origin && allowedOrigins.has(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
+    res.setHeader("Access-Control-Max-Age", "86400");
+  }
+
+  if (req.method === "OPTIONS") {
+    if (!origin || !allowedOrigins.has(origin)) {
+      return res.status(403).end();
+    }
+    return res.status(204).end();
+  }
+
+  return next();
+});
 
 app.get("/health", (req, res) => {
   res.json({
