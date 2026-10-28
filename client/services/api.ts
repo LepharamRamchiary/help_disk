@@ -1,4 +1,5 @@
 import {
+  USER_ROLES,
   Ticket,
   TicketPriority,
   TicketStatus,
@@ -22,7 +23,7 @@ export interface AuthenticatedUser {
   id: number | string;
   name: string | null;
   email: string;
-  role?: string;
+  role: UserRole;
   createdAt?: string;
 }
 
@@ -47,12 +48,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
+function isUserRole(value: unknown): value is UserRole {
+  return typeof value === 'string' && USER_ROLES.some((role) => role === value);
+}
+
 function parseAuthenticatedUser(value: unknown): AuthenticatedUser {
   if (
     !isRecord(value) ||
     (typeof value.id !== 'number' && typeof value.id !== 'string') ||
     typeof value.email !== 'string' ||
-    (value.name !== null && typeof value.name !== 'string')
+    (value.name !== null && typeof value.name !== 'string') ||
+    !isUserRole(value.role)
   ) {
     throw new AuthApiError('The auth service returned an invalid user profile.', 502);
   }
@@ -61,7 +67,7 @@ function parseAuthenticatedUser(value: unknown): AuthenticatedUser {
     id: value.id,
     name: value.name,
     email: value.email,
-    role: typeof value.role === 'string' ? value.role : undefined,
+    role: value.role,
     createdAt: typeof value.createdAt === 'string' ? value.createdAt : undefined,
   };
 }

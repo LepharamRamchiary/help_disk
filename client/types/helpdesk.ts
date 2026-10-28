@@ -1,9 +1,12 @@
-export type UserRole =
-  | 'PLATFORM_ADMIN'
-  | 'COMPANY_ADMIN'
-  | 'SUPPORT_MANAGER'
-  | 'SUPPORT_AGENT'
-  | 'CUSTOMER';
+export const USER_ROLES = [
+  'PLATFORM_ADMIN',
+  'COMPANY_ADMIN',
+  'SUPPORT_MANAGER',
+  'SUPPORT_AGENT',
+  'CUSTOMER',
+] as const;
+
+export type UserRole = (typeof USER_ROLES)[number];
 
 export type TicketStatus =
   | 'OPEN'

@@ -37,16 +37,7 @@ const AUTH_TOKEN_KEY = 'helpdesk.auth.token';
 
 function toHelpDeskUser(user: AuthenticatedUser): User {
   const fullName = user.name?.trim() || user.email.split('@')[0];
-  const role: UserRole =
-    user.role === 'PLATFORM_ADMIN'
-      ? 'PLATFORM_ADMIN'
-      : user.role === 'CUSTOMER'
-        ? 'CUSTOMER'
-        : user.role === 'SUPPORT_MANAGER'
-          ? 'SUPPORT_MANAGER'
-          : user.role === 'ADMIN' || user.role === 'COMPANY_ADMIN'
-            ? 'COMPANY_ADMIN'
-            : 'SUPPORT_AGENT';
+  const role = user.role;
 
   return {
     ...INITIAL_TEAM_MEMBERS[0],

@@ -1,0 +1,15 @@
+UPDATE `users`
+SET `role` = CASE
+    WHEN `role` = 'USER' THEN 'CUSTOMER'
+    WHEN `role` = 'ADMIN' THEN 'PLATFORM_ADMIN'
+    ELSE `role`
+END;
+
+ALTER TABLE `users`
+MODIFY COLUMN `role` ENUM(
+    'PLATFORM_ADMIN',
+    'COMPANY_ADMIN',
+    'SUPPORT_MANAGER',
+    'SUPPORT_AGENT',
+    'CUSTOMER'
+) NOT NULL DEFAULT 'CUSTOMER';
