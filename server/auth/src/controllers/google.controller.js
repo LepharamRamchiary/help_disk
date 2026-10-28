@@ -1,6 +1,9 @@
 import { OAuth2Client } from "google-auth-library";
 import { pool } from "../db/index.js";
 import { issueToken } from "../utils/token.js";
+import { ApiError } from "../utils/ApiError.js";
+import { ApiResponse } from "../utils/ApiResponse.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -12,14 +15,11 @@ const findUser = async (column, value) => {
   return rows[0];
 };
 
-const googleAuth = async (req, res) => {
+const googleAuth = asyncHandler(async (req, res) => {
   const { credential } = req.body ?? {};
 
   if (!process.env.GOOGLE_CLIENT_ID) {
-    return res.status(503).json({
-      success: false,
-      message: "Google sign-in is not configured",
-    });
+    throw new ApiError(503, "Google sign-in is not configured");
   }
 
   if (
@@ -27,12 +27,9 @@ const googleAuth = async (req, res) => {
     !credential ||
     credential.length > 4096
   ) {
-    return res
-      .status(400)
-      .json({ success: false, message: "Google credential is required" });
+    throw new ApiError(400, "Google credential is required");
   }
 
-  // 1. Verify the token with Google (signature, expiry, audience)
   let profile;
   try {
     const ticket = await googleClient.verifyIdToken({
@@ -41,19 +38,11 @@ const googleAuth = async (req, res) => {
     });
     profile = ticket.getPayload();
   } catch {
-    return res
-      .status(401)
-      .json({ success: false, message: "Invalid Google token" });
+    throw new ApiError(401, "Invalid Google token");
   }
 
-  // 2. Only trust verified Google emails
   if (!profile?.sub || !profile.email || profile.email_verified !== true) {
-    return res
-      .status(401)
-      .json({
-        success: false,
-        message: "Google account email is not verified",
-      });
+    throw new ApiError(401, "Google account email is not verified");
   }
 
   const googleId = profile.sub;
@@ -61,14 +50,12 @@ const googleAuth = async (req, res) => {
   const name = (profile.name || email.split("@")[0]).slice(0, 100);
   const avatarUrl = profile.picture ? profile.picture.slice(0, 500) : null;
 
-  // 3. Find by googleId, then by email (account linking), else create
   let user = await findUser("googleId", googleId);
 
   if (!user) {
     user = await findUser("email", email);
 
     if (user) {
-      // Existing email/password account: link Google to it
       await pool.execute(
         `UPDATE users
          SET googleId = ?, avatarUrl = COALESCE(avatarUrl, ?), emailVerified = 1,
@@ -84,27 +71,32 @@ const googleAuth = async (req, res) => {
           [name, email, googleId, avatarUrl],
         );
       } catch (error) {
-        // Two requests at once for the same new user
         if (error.code !== "ER_DUP_ENTRY") throw error;
       }
       user = await findUser("email", email);
     }
   }
 
-  return res.status(200).json({
-    success: true,
-    message: "Google login successful",
-    data: {
-      ...issueToken(user),
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        createdAt: user.createdAt,
+  if (!user) {
+    throw new ApiError(500, "Could not complete Google sign-in");
+  }
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        ...issueToken(user),
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          createdAt: user.createdAt,
+        },
       },
-    },
-  });
-};
+      "Google login successful",
+    ),
+  );
+});
 
 export { googleAuth };
