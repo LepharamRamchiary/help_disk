@@ -10,6 +10,7 @@ import { issueToken } from "../utils/token.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { PLATFORM_ADMIN_ROLE } from "../constants.js";
 
 const scrypt = promisify(scryptCallback);
 
@@ -236,7 +237,7 @@ const getMe = asyncHandler(async (req, res) => {
 });
 
 const requireAdmin = asyncHandler(async (req, res, next) => {
-  if (req.authenticatedUser.role !== "ADMIN") {
+  if (req.authenticatedUser.role !== PLATFORM_ADMIN_ROLE) {
     throw new ApiError(403, "Administrator access is required");
   }
 
