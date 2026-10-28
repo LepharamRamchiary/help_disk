@@ -11,17 +11,22 @@ import {
   requireAdmin,
 } from "../controllers/auth.controller.js";
 import { googleAuth } from "../controllers/google.controller.js";
+import { authLimiter } from "../middlewares/rateLimit.middleware.js";
 
 const router = Router();
 
-router.post("/google", googleAuth);
+// google auth route
+router.route("/google").post(authLimiter, googleAuth);
 
-router.post("/register", register);
-router.post("/users", authenticate, addUser);
-router.get("/users", authenticate, getAllUsers);
-router.delete("/users/:id", authenticate, requireAdmin, deleteUser);
-router.post("/login", login);
-router.get("/me", authenticate, getMe);
-router.post("/logout", authenticate, logout);
+
+router.route("/register").post(authLimiter, register);
+router.route("/login").post(authLimiter, login);
+
+
+router.route("/users").post(authenticate, addUser);
+router.route("/users").get(authenticate, getAllUsers);
+router.route("/users/:id").delete(authenticate, requireAdmin, deleteUser);
+router.route("/me").get(authenticate, getMe);
+router.route("/logout").post(authenticate, logout);
 
 export default router;
