@@ -11,6 +11,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { PLATFORM_ADMIN_ROLE } from "../constants.js";
+import { notifyRegistration } from "../utils/notifyRegistration.js";
 
 const scrypt = promisify(scryptCallback);
 
@@ -61,6 +62,8 @@ const createUser = async (req, res, message, createSession = false) => {
       [result.insertId],
     );
     const user = users[0];
+
+     void notifyRegistration(user, createSession ? "email" : "added by admin");
 
     return res
       .status(201)
