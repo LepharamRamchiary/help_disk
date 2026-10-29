@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useHelpDesk } from '@/context/HelpDeskContext';
 import GoogleAuthButton from '@/components/google-provider/GoogleAuthButton';
+import { AuthApiService } from '@/services/api';
 import {
   Headset,
   Eye,
@@ -53,6 +54,8 @@ export function AuthViews() {
   const [resetSubmitted, setResetSubmitted] = useState(false);
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const [resetError, setResetError] = useState<string | null>(null);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
 
   useEffect(() => {
     if (cooldownSeconds <= 0) return;
@@ -149,25 +152,50 @@ export function AuthViews() {
     }
   };
 
-  const handleForgotSubmit = (e: React.FormEvent) => {
+  const handleForgotSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setResetError(null);
-    if (!resetEmail.trim() || !resetEmail.includes('@')) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(resetEmail.trim())) {
       setResetError('Please enter a valid email address.');
       return;
     }
-    setResetSubmitted(true);
-    setCooldownSeconds(60);
+    setResetLoading(true);
+    try {
+      await AuthApiService.requestPasswordReset(resetEmail.trim());
+      setResetSubmitted(true);
+      setCooldownSeconds(60);
+    } catch (error) {
+      setResetError(
+        error instanceof Error
+          ? error.message
+          : 'Could not send reset instructions. Please try again.'
+      );
+    } finally {
+      setResetLoading(false);
+    }
   };
 
-  const handleResendReset = () => {
-    if (cooldownSeconds > 0) return;
-    setCooldownSeconds(60);
-    addToast(
-      'Reset Instructions Dispatched',
-      'If an account matches that address, a new recovery link has been sent.',
-      'info'
-    );
+  const handleResendReset = async () => {
+    if (cooldownSeconds > 0 || resendLoading) return;
+    setResetError(null);
+    setResendLoading(true);
+    try {
+      await AuthApiService.requestPasswordReset(resetEmail.trim());
+      setCooldownSeconds(60);
+      addToast(
+        'Reset Instructions Dispatched',
+        'If an account matches that address, a new recovery link has been sent.',
+        'info'
+      );
+    } catch (error) {
+      setResetError(
+        error instanceof Error
+          ? error.message
+          : 'Could not resend reset instructions. Please try again.'
+      );
+    } finally {
+      setResendLoading(false);
+    }
   };
 
   return (
@@ -664,13 +692,19 @@ export function AuthViews() {
 
                   <button
                     type="submit"
+                    disabled={resetLoading}
                     className="w-full py-2.5 px-4 text-xs font-semibold text-white bg-[#047857] hover:bg-[#065F46] rounded-lg transition-colors"
                   >
-                    Send Reset Instructions
+                    {resetLoading ? 'Sending…' : 'Send Reset Instructions'}
                   </button>
                 </form>
               ) : (
                 <div className="bg-[#ECFDF5] border border-[#10B981]/30 rounded-xl p-5 space-y-4">
+                  {resetError && (
+                    <p role="alert" className="text-xs text-red-700">
+                      {resetError}
+                    </p>
+                  )}
                   <div className="flex items-start gap-3">
                     <CheckCircle2 className="w-5 h-5 text-[#047857] shrink-0 mt-0.5" />
                     <div className="space-y-1">
@@ -695,7 +729,7 @@ export function AuthViews() {
                     </span>
                     <button
                       type="button"
-                      disabled={cooldownSeconds > 0}
+                      disabled={cooldownSeconds > 0 || resendLoading}
                       onClick={handleResendReset}
                       className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
                         cooldownSeconds > 0
@@ -704,7 +738,7 @@ export function AuthViews() {
                       }`}
                     >
                       <RefreshCw className="w-3 h-3" />
-                      <span>Resend Link</span>
+                      <span>{resendLoading ? 'Sending…' : 'Resend Link'}</span>
                     </button>
                   </div>
                 </div>
