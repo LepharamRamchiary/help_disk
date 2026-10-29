@@ -152,6 +152,18 @@ export const AuthApiService = {
         body: JSON.stringify({ credential }),
       })
     ),
+  requestPasswordReset: async (email: string): Promise<void> => {
+    await authRequest('/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  },
+  resetPassword: async (token: string, password: string): Promise<void> => {
+    await authRequest('/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, password }),
+    });
+  },
   me: async (token: string): Promise<AuthenticatedUser> =>
     parseAuthenticatedUser(
       await authRequest('/me', {
@@ -189,6 +201,13 @@ export const SPRING_BOOT_ENDPOINTS: ApiEndpointSpec[] = [
     path: '/api/v1/auth/forgot-password',
     springController: 'AuthController#requestPasswordReset',
     description: 'Dispatches time-bound SHA-256 reset token without leaking email enumeration.',
+  },
+  {
+    module: 'Authentication',
+    method: 'POST',
+    path: '/api/v1/auth/reset-password',
+    springController: 'AuthController#resetPassword',
+    description: 'Validates a time-bound reset token and updates the account password.',
   },
   {
     module: 'Tickets',
@@ -299,12 +318,6 @@ export const HelpDeskApiService = {
         token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.helpdesk-pro-demo',
         authenticatedAt: new Date().toISOString(),
       })),
-    requestPasswordReset: async (email: string) =>
-      requestWithFallback(
-        '/auth/forgot-password',
-        { method: 'POST', body: JSON.stringify({ email }) },
-        () => ({ accepted: true, timestamp: new Date().toISOString() })
-      ),
   },
   tickets: {
     exportToCsv: (tickets: Ticket[], filename = 'helpdesk-pro-tickets-export.csv') => {
