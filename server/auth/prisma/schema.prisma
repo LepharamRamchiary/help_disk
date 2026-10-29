@@ -16,9 +16,14 @@ model User {
   avatarUrl     String?  @db.VarChar(500)
   emailVerified Boolean  @default(false)
   role          UserRole @default(CUSTOMER)
+
+  resetPasswordTokenHash String?   @db.Char(64)
+  resetPasswordExpires   DateTime? @db.DateTime(3)
+
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  @@index([resetPasswordTokenHash])
   @@map("users")
 }
 

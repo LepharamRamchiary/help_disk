@@ -63,7 +63,7 @@ const createUser = async (req, res, message, createSession = false) => {
     );
     const user = users[0];
 
-     void notifyRegistration(user, createSession ? "email" : "added by admin");
+    void notifyRegistration(user, createSession ? "email" : "added by admin");
 
     return res
       .status(201)
@@ -115,6 +115,14 @@ const login = asyncHandler(async (req, res) => {
     [normalizedEmail],
   );
   const user = users[0];
+
+  if (user && !user.passwordHash) {
+    throw new ApiError(
+      400,
+      "You registered with Google. Please log in with Google instead.",
+    );
+  }
+
   const [scheme, salt, storedHash] = (user?.passwordHash ?? "").split("$");
   const validHash =
     scheme === "scrypt" &&
