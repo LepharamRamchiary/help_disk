@@ -24,7 +24,7 @@ const hashToken = (token) => createHash("sha256").update(token).digest("hex");
 const sendResetEmail = async (user, token) => {
   try {
     const baseUrl = (
-      process.env.FRONTEND_URL || "http://localhost:3000"
+      process.env.APP_URL
     ).replace(/\/$/, "");
     const mail = passwordResetTemplate({
       name: user.name,
