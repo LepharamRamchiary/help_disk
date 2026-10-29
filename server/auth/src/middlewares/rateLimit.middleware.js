@@ -24,4 +24,14 @@ const authLimiter = rateLimit({
   ),
 });
 
-export { globalLimiter, authLimiter };
+const passwordResetLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  heandler: createHandler(
+    "Too many password reset attempts, please try again after 15 minutes",
+  ),
+});
+
+export { globalLimiter, authLimiter, passwordResetLimiter };
