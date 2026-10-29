@@ -4,6 +4,7 @@ import { issueToken } from "../utils/token.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { notifyRegistration } from "../utils/notifyRegistration.js";
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -51,11 +52,13 @@ const googleAuth = asyncHandler(async (req, res) => {
   const avatarUrl = profile.picture ? profile.picture.slice(0, 500) : null;
 
   let user = await findUser("googleId", googleId);
+  let isNewUser = false;
 
   if (!user) {
     user = await findUser("email", email);
 
     if (user) {
+      // Existing email account: link Google to it (no welcome email)
       await pool.execute(
         `UPDATE users
          SET googleId = ?, avatarUrl = COALESCE(avatarUrl, ?), emailVerified = 1,
@@ -70,6 +73,9 @@ const googleAuth = asyncHandler(async (req, res) => {
            VALUES (?, ?, NULL, ?, ?, 1, CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3))`,
           [name, email, googleId, avatarUrl],
         );
+        // Only set after a successful insert, so a duplicate-entry race
+        // never sends a second welcome email
+        isNewUser = true;
       } catch (error) {
         if (error.code !== "ER_DUP_ENTRY") throw error;
       }
@@ -79,6 +85,11 @@ const googleAuth = asyncHandler(async (req, res) => {
 
   if (!user) {
     throw new ApiError(500, "Could not complete Google sign-in");
+  }
+
+  // Fire-and-forget: email problems must never break sign-in
+  if (isNewUser) {
+    void notifyRegistration(user, "google");
   }
 
   return res.status(200).json(
