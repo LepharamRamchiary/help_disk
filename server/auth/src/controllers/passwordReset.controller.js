@@ -23,9 +23,7 @@ const hashToken = (token) => createHash("sha256").update(token).digest("hex");
 
 const sendResetEmail = async (user, token) => {
   try {
-    const baseUrl = (
-      process.env.APP_URL
-    ).replace(/\/$/, "");
+    const baseUrl = process.env.APP_URL.replace(/\/$/, "");
     const mail = passwordResetTemplate({
       name: user.name,
       resetUrl: `${baseUrl}/reset-password?token=${token}`,
@@ -68,29 +66,30 @@ const forgotPassword = asyncHandler(async (req, res) => {
   );
   const user = users[0];
 
+  if (!user) {
+    throw new ApiError(404, "No account found with this email address.");
+  }
+
   // Google-only account: no password to reset
-  if (user && !user.passwordHash) {
+  if (!user.passwordHash) {
     throw new ApiError(
       400,
       "You registered with Google. Please log in with Google instead.",
     );
   }
 
-  if (user) {
-    const token = randomBytes(32).toString("hex");
+  const token = randomBytes(32).toString("hex");
 
-    await pool.execute(
-      `UPDATE users
-       SET resetPasswordTokenHash = ?,
-           resetPasswordExpires = DATE_ADD(CURRENT_TIMESTAMP(3), INTERVAL ${RESET_TOKEN_MINUTES} MINUTE),
-           updatedAt = CURRENT_TIMESTAMP(3)
-       WHERE id = ?`,
-      [hashToken(token), user.id],
-    );
+  await pool.execute(
+    `UPDATE users
+     SET resetPasswordTokenHash = ?,
+         resetPasswordExpires = DATE_ADD(CURRENT_TIMESTAMP(3), INTERVAL ${RESET_TOKEN_MINUTES} MINUTE),
+         updatedAt = CURRENT_TIMESTAMP(3)
+     WHERE id = ?`,
+    [hashToken(token), user.id],
+  );
 
-    // fire-and-forget so response time doesn't reveal whether the email exists
-    void sendResetEmail(user, token);
-  }
+  void sendResetEmail(user, token);
 
   return res
     .status(200)
@@ -98,7 +97,7 @@ const forgotPassword = asyncHandler(async (req, res) => {
       new ApiResponse(
         200,
         null,
-        "If an account exists for this email, a password reset link has been sent.",
+        "A password reset link has been sent to your email.",
       ),
     );
 });
