@@ -2,7 +2,7 @@ import { sendEmail } from "./nodemailer.js";
 import {
   welcomeUserTemplate,
   newUserAdminTemplate,
-} from "../templates/welcomeEmail.js";
+} from "../../templates/welcomeEmail.js";
 
 export const notifyRegistration = async (user, method = "email") => {
   try {

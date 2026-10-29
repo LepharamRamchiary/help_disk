@@ -29,7 +29,7 @@ const passwordResetLimiter = rateLimit({
   limit: 5,
   standardHeaders: true,
   legacyHeaders: false,
-  heandler: createHandler(
+  handler: createHandler(
     "Too many password reset attempts, please try again after 15 minutes",
   ),
 });

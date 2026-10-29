@@ -12,6 +12,7 @@ import {
 } from "../controllers/auth.controller.js";
 import { googleAuth } from "../controllers/google.controller.js";
 import { authLimiter, passwordResetLimiter } from "../middlewares/rateLimit.middleware.js";
+import { forgotPassword, resetPassword } from "../controllers/passwordReset.controller.js";
 
 const router = Router();
 

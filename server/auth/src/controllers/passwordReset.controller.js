@@ -4,11 +4,11 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { hashPassword } from "../utils/password.js";
-import { sendEmail } from "../utils/sendEmail.js";
+import { sendEmail } from "../utils/nodemailer.js";
 import {
   passwordResetTemplate,
   passwordChangedTemplate,
-} from "../templates/passwordResetEmail.js";
+} from "../../templates/passwordResetEmail.js";
 
 const RESET_TOKEN_MINUTES = 15;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
