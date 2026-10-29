@@ -1,7 +1,7 @@
 "use client";
 
 import { GoogleLogin } from "@react-oauth/google";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface GoogleAuthButtonProps {
   onCredential: (credential: string) => Promise<void>;
@@ -10,6 +10,20 @@ interface GoogleAuthButtonProps {
 
 export default function GoogleAuthButton({ onCredential, onError }: GoogleAuthButtonProps) {
   const [processing, setProcessing] = useState(false);
+  const [buttonWidth, setButtonWidth] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const resizeObserver = new ResizeObserver(([entry]) => {
+      setButtonWidth(Math.min(400, Math.floor(entry.contentRect.width)));
+    });
+
+    resizeObserver.observe(container);
+    return () => resizeObserver.disconnect();
+  }, []);
 
   if (!process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID) {
     return (
@@ -20,14 +34,20 @@ export default function GoogleAuthButton({ onCredential, onError }: GoogleAuthBu
   }
 
   return (
-    <div className="flex flex-col items-center gap-2" aria-busy={processing}>
+    <div
+      ref={containerRef}
+      className="flex w-full flex-col items-center gap-2"
+      aria-busy={processing}
+    >
       <div className="w-full border-t border-[#E2E8F0]" />
       {processing ? (
         <p role="status" className="text-xs text-[#64748B]">
           Signing in with Google…
         </p>
-      ) : (
+      ) : buttonWidth > 0 ? (
         <GoogleLogin
+          width={buttonWidth}
+          containerProps={{ className: "w-full" }}
           text="continue_with"
           onSuccess={async ({ credential }) => {
             if (!credential) {
@@ -43,7 +63,7 @@ export default function GoogleAuthButton({ onCredential, onError }: GoogleAuthBu
           }}
           onError={() => onError("Google sign-in failed. Please try again.")}
         />
-      )}
+      ) : null}
     </div>
   );
 }
