@@ -1,48 +1,124 @@
+
 services:
+  # =====================================
+  # CLIENT - NEXT.JS
+  # =====================================
   client:
     build:
       context: ./client
       args:
         NEXT_PUBLIC_API_BASE_URL: http://localhost:8000/api/v1
         NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+
     ports:
       - "3000:3000"
+
     environment:
       NEXT_PUBLIC_API_BASE_URL: http://localhost:8000/api/v1
       NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
-    depends_on:
-      - api-gateway
 
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+
+    restart: unless-stopped
+
+  # =====================================
+  # API GATEWAY
+  # =====================================
   api-gateway:
     build:
       context: ./server/api-gateway
+
     ports:
       - "8000:8000"
+
     environment:
       PORT: 8000
       AUTH_SERVICE_URL: http://auth:8001
+      SUPPORT_SERVICE_URL: http://support:8002
+
+      CORS_ALLOWED_ORIGINS: http://localhost:3000
+
     depends_on:
       auth:
         condition: service_healthy
+      support:
+        condition: service_healthy
 
-  auth:
-    build:
-      context: ./server/auth
-    ports:
-      - "8001:8001"
-    env_file:
-      - ./server/auth/.env
-    environment:
-      PORT: 8001
     healthcheck:
       test:
         [
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:8001/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))",
+          "fetch('http://127.0.0.1:8000/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"
         ]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 10s
+
+    restart: unless-stopped
+
+  # =====================================
+  # AUTH SERVICE
+  # =====================================
+  auth:
+    build:
+      context: ./server/auth
+
+    ports:
+      - "8001:8001"
+
+    env_file:
+      - ./server/auth/.env
+
+    environment:
+      PORT: 8001
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8001/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+    restart: unless-stopped
+
+  # =====================================
+  # SUPPORT SERVICE
+  # =====================================
+  support:
+    build:
+      context: ./server/support
+
+    ports:
+      - "8002:8002"
+
+    env_file:
+      - ./server/support/.env
+
+    environment:
+      PORT: 8002
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8002/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+    restart: unless-stopped
