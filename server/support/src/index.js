@@ -4,7 +4,6 @@ import connectDB from "./db/index.js";
 import { app } from "./app.js";
 
 const PORT = Number(process.env.PORT);
-const HOST = process.env.HOST;
 
 if (!Number.isInteger(PORT) || PORT <= 0) {
   throw new Error(`Invalid PORT value: ${process.env.PORT}`);
@@ -14,8 +13,8 @@ const startServer = async () => {
   try {
     await connectDB();
 
-    const server = app.listen(PORT, HOST, () => {
-      console.log(`Support server is running on http://${HOST}:${PORT}`);
+    const server = app.listen(PORT, () => {
+      console.log(`Support server is running on http://localhost:${PORT}`);
     });
 
     const shutdown = (signal) => {
