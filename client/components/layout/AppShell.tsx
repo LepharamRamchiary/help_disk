@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { useHelpDesk, SimulationState } from "@/context/HelpDeskContext";
+import { useHelpDesk } from "@/context/HelpDeskContext";
 import { PageView, UserRole } from "@/types/helpdesk";
 import { Avatar, Modal } from "@/components/ui/design-system";
 import { SPRING_BOOT_ENDPOINTS, SPRING_BOOT_API_CONFIG } from "@/services/api";
@@ -64,8 +64,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     toggleSidebarStyle,
     sidebarCollapsed,
     setSidebarCollapsed,
-    simulationState,
-    setSimulationState,
     tickets,
     customers,
     unreadNotificationsCount,
@@ -1024,81 +1022,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
         </header>
-
-        {/* Sub-Toolbar for Role Preview & Data Source Status */}
-        <div className="bg-[#F0FDF4] border-b border-[#10B981]/20 px-4 sm:px-6 lg:px-8 py-2 flex flex-wrap items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2 text-[#065F46] flex-wrap">
-            <span className="font-semibold">Perspective Switcher:</span>
-            {(
-              [
-                { role: "COMPANY_ADMIN", label: "Admin / Manager" },
-                { role: "SUPPORT_AGENT", label: "Support Agent" },
-                { role: "CUSTOMER", label: "Customer Portal" },
-                { role: "PLATFORM_ADMIN", label: "Platform Admin" },
-              ] as const
-            ).map((r) => (
-              <button
-                key={r.role}
-                type="button"
-                onClick={() => switchRolePersona(r.role)}
-                className={`px-2.5 py-1 rounded-md font-medium transition-colors whitespace-nowrap ${
-                  currentUser.role === r.role
-                    ? "bg-[#047857] text-white shadow-2xs"
-                    : "bg-white/80 text-[#047857] hover:bg-white border border-[#10B981]/30"
-                }`}
-              >
-                {r.label}
-              </button>
-            ))}
-            <span className="text-slate-300 hidden sm:inline">·</span>
-            <button
-              type="button"
-              onClick={() => navigateTo("landing")}
-              className="text-[#047857] hover:underline font-medium whitespace-nowrap"
-            >
-              Landing Page
-            </button>
-            <span className="text-slate-300 hidden sm:inline">·</span>
-            <button
-              type="button"
-              onClick={() => navigateTo("login")}
-              className="text-[#047857] hover:underline font-medium whitespace-nowrap"
-            >
-              Login Screen
-            </button>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] text-[#065F46] hidden xl:inline">
-              Data Source: Development API Adapter (Spring Boot Ready)
-            </span>
-            <div className="flex items-center gap-1 bg-white border border-[#E2E8F0] rounded-lg p-0.5">
-              {(
-                ["NORMAL", "LOADING", "EMPTY", "ERROR"] as SimulationState[]
-              ).map((st) => (
-                <button
-                  key={st}
-                  type="button"
-                  onClick={() => setSimulationState(st)}
-                  className={`px-2 py-0.5 text-[11px] font-medium rounded transition-colors ${
-                    simulationState === st
-                      ? "bg-[#047857] text-white"
-                      : "text-slate-600 hover:text-slate-900"
-                  }`}
-                  title={`Simulate ${st.toLowerCase()} state across views`}
-                >
-                  {st === "NORMAL"
-                    ? "Live Demo"
-                    : st === "LOADING"
-                      ? "Skeleton"
-                      : st === "EMPTY"
-                        ? "Empty"
-                        : "Error"}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
 
         {/* Page Viewport */}
         <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6 max-w-[1440px] w-full mx-auto">

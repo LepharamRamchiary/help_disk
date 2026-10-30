@@ -148,7 +148,7 @@ export function DashboardView() {
   if (simulationState === 'ERROR') {
     return (
       <ErrorBanner
-        message="GET /api/v1/dashboard/summary timed out after 5000ms. Verify that the Spring Boot service is running or switch back to Live Demo mode."
+        message="GET /api/v1/dashboard/summary timed out after 5000ms. Verify that the Spring Boot service is running, then retry."
         onRetry={() => setSimulationState('NORMAL')}
       />
     );
