@@ -6,3 +6,7 @@ api-gateway/.env
 # auth
 auth/node_modules
 auth/.env
+
+# support
+support/node_modules
+support/.env
