@@ -1,12 +1,15 @@
 # api gateway
 api-gateway/node_modules
 api-gateway/.env
+api-gateway/.env.local
 
 
 # auth
 auth/node_modules
 auth/.env
+auth/.env.local
 
 # support
 support/node_modules
 support/.env
+support/.env.local
