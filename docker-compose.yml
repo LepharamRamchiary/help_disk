@@ -14,6 +14,7 @@ services:
       - "3000:3000"
 
     environment:
+      NODE_ENV: production
       NEXT_PUBLIC_API_BASE_URL: http://localhost:8000/api/v1
       NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
 
@@ -34,7 +35,9 @@ services:
       - "8000:8000"
 
     environment:
+      NODE_ENV: production
       PORT: 8000
+
       AUTH_SERVICE_URL: http://auth:8001
       SUPPORT_SERVICE_URL: http://support:8002
 
@@ -52,7 +55,7 @@ services:
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:8000/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"
+          "fetch('http://127.0.0.1:8000/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
         ]
       interval: 30s
       timeout: 5s
@@ -62,7 +65,7 @@ services:
     restart: unless-stopped
 
   # =====================================
-  # AUTH SERVICE
+  # AUTH SERVICE - MYSQL
   # =====================================
   auth:
     build:
@@ -75,7 +78,13 @@ services:
       - ./server/auth/.env
 
     environment:
+      NODE_ENV: production
       PORT: 8001
+      DB_HOST: host.docker.internal
+      DATABASE_URL: "mysql://root:${MYSQL_PASSWORD}@host.docker.internal:3306/help_dask_auth"
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
     healthcheck:
       test:
@@ -83,17 +92,17 @@ services:
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:8001/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"
+          "fetch('http://127.0.0.1:8001/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
         ]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 10s
+      start_period: 15s
 
     restart: unless-stopped
 
   # =====================================
-  # SUPPORT SERVICE
+  # SUPPORT SERVICE - MONGODB
   # =====================================
   support:
     build:
@@ -106,7 +115,13 @@ services:
       - ./server/support/.env
 
     environment:
+      NODE_ENV: production
       PORT: 8002
+      MONGODB_URI: mongodb://mongo:27017/support_db
+
+    depends_on:
+      mongo:
+        condition: service_healthy
 
     healthcheck:
       test:
@@ -114,11 +129,45 @@ services:
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:8002/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"
+          "fetch('http://127.0.0.1:8002/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
         ]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 10s
+      start_period: 15s
 
     restart: unless-stopped
+
+  # =====================================
+  # MONGODB DATABASE
+  # =====================================
+  mongo:
+    image: mongo:8
+
+    ports:
+      - "27017:27017"
+
+    volumes:
+      - support_mongo_data:/data/db
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mongosh",
+          "--quiet",
+          "--eval",
+          "db.adminCommand('ping').ok"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+    restart: unless-stopped
+
+# =====================================
+# PERSISTENT VOLUMES
+# =====================================
+volumes:
+  support_mongo_data:
