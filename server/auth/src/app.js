@@ -27,6 +27,7 @@ app.get("/health", (req, res) => {
   res.json({
     status: "ok",
     service: "auth",
+    route: "/health",
   });
 });
 

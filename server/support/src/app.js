@@ -18,11 +18,11 @@ app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 
 app.use(globalLimiter);
 
-// Health check
 app.get("/health", (req, res) => {
   res.json({
     status: "ok",
     service: "support",
+    route: "/health",
   });
 });
 
