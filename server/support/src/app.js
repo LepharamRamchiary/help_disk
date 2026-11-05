@@ -6,6 +6,7 @@ import {
   errorHandler,
 } from "./middlewares/error.middleware.js";
 import { globalLimiter } from "./middlewares/rateLimit.middleware.js";
+import ticketRoutes from "./routes/ticket.routes.js";
 
 const app = express();
 
@@ -27,6 +28,8 @@ app.get("/health", (req, res) => {
     route: "/health",
   });
 });
+
+app.use("/tickets", ticketRoutes);
 
 // Must be last, in this order
 app.use(notFoundHandler);

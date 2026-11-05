@@ -38,6 +38,8 @@ export function CreateTicketForm({
   const [dueDate, setDueDate] = useState<string>('2026-10-12');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [dragActive, setDragActive] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const [errors, setErrors] = useState<{ subject?: string; description?: string; file?: string }>(
     {}
   );
@@ -85,7 +87,7 @@ export function CreateTicketForm({
     ]);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const nextErrors: { subject?: string; description?: string } = {};
 
@@ -102,18 +104,27 @@ export function CreateTicketForm({
       return;
     }
 
-    const created = createTicket({
-      subject,
-      description,
-      customerId: isCustomerRole ? 'cust-1' : customerId,
-      categoryId,
-      priority,
-      assignedAgentId: isCustomerRole ? null : assignedAgentId || null,
-      dueDate: isCustomerRole ? undefined : dueDate,
-      attachments,
-    });
-
-    onSuccess(created.id);
+    setIsSubmitting(true);
+    setSubmitError('');
+    try {
+      const created = await createTicket({
+        subject,
+        description,
+        customerId: isCustomerRole ? 'cust-1' : customerId,
+        categoryId,
+        priority,
+        assignedAgentId: isCustomerRole ? null : assignedAgentId || null,
+        dueDate: isCustomerRole ? undefined : dueDate,
+        attachments,
+      });
+      onSuccess(created.id);
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error ? error.message : 'Ticket creation failed. Please try again.'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -406,6 +417,11 @@ export function CreateTicketForm({
       </div>
 
       {/* Footer Actions */}
+      {submitError && (
+        <p role="alert" className="text-xs text-red-600">
+          {submitError}
+        </p>
+      )}
       <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#E2E8F0]">
         <button
           type="button"
@@ -416,10 +432,11 @@ export function CreateTicketForm({
         </button>
         <button
           type="submit"
+          disabled={isSubmitting}
           className="px-5 py-2 text-xs font-semibold text-white bg-[#047857] hover:bg-[#065F46] rounded-lg transition-colors inline-flex items-center gap-1.5 shadow-2xs"
         >
           <CheckCircle2 className="w-3.5 h-3.5" />
-          <span>Create Ticket</span>
+          <span>{isSubmitting ? 'Creating…' : 'Create Ticket'}</span>
         </button>
       </div>
     </form>

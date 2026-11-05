@@ -25,8 +25,7 @@ const ticketSchema = new mongoose.Schema(
       maxlength: 200,
     },
     requester: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      type: String,
       required: true,
     },
 
@@ -46,13 +45,8 @@ const ticketSchema = new mongoose.Schema(
     category: {
       type: String,
       required: [true, "Support category is required"],
-      enum: [
-        "Authentication & Access",
-        "Billing & Invoices",
-        "Platform Performance",
-        "Account Management",
-        "API & Webhooks",
-      ],
+      trim: true,
+      maxlength: 100,
     },
 
     priority: {

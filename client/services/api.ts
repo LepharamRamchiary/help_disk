@@ -320,6 +320,57 @@ export const HelpDeskApiService = {
       })),
   },
   tickets: {
+    create: async (
+      input: {
+        subject: string;
+        description: string;
+        category: string;
+        priority: TicketPriority;
+      },
+      token: string
+    ): Promise<{ id: string }> => {
+      let response: Response;
+      try {
+        response = await fetch(
+          `${SPRING_BOOT_API_CONFIG.baseUrl.replace(/\/$/, '')}/support/tickets`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(input),
+          }
+        );
+      } catch {
+        throw new Error('Unable to reach the support service. Please try again.');
+      }
+
+      let body: unknown;
+      try {
+        body = await response.json();
+      } catch {
+        throw new Error('The support service returned an invalid response.');
+      }
+
+      if (!isRecord(body)) {
+        throw new Error('The support service returned an invalid response.');
+      }
+      if (!response.ok || body.success !== true || !isRecord(body.data)) {
+        throw new Error(
+          typeof body.message === 'string'
+            ? body.message
+            : 'Ticket creation failed.'
+        );
+      }
+
+      const ticketNumber = body.data.ticketNumber;
+      if (typeof ticketNumber !== 'string' || !ticketNumber) {
+        throw new Error('The support service returned an invalid ticket.');
+      }
+
+      return { id: ticketNumber };
+    },
     exportToCsv: (tickets: Ticket[], filename = 'helpdesk-pro-tickets-export.csv') => {
       const headers = [
         'Ticket ID',
