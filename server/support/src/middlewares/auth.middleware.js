@@ -71,6 +71,7 @@ const authenticate = (req, res, next) => {
     id: payload.sub,
     name: payload.name,
     email: payload.email,
+    role: payload.role,
   };
   return next();
 };
@@ -82,4 +83,11 @@ const requirePlatformAdmin = (req, res, next) => {
   return next();
 };
 
-export { authenticate, requirePlatformAdmin };
+const requireCustomer = (req, res, next) => {
+  if (req.authenticatedUser?.role !== "CUSTOMER") {
+    return next(new ApiError(403, "Customer access is required"));
+  }
+  return next();
+};
+
+export { authenticate, requireCustomer, requirePlatformAdmin };
