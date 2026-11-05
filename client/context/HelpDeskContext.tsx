@@ -18,7 +18,13 @@ import {
   ToastMessage,
   Attachment,
 } from '@/types/helpdesk';
-import { AuthApiError, AuthApiService, type AuthenticatedUser } from '@/services/api';
+import {
+  AuthApiError,
+  AuthApiService,
+  HelpDeskApiService,
+  SPRING_BOOT_API_CONFIG,
+  type AuthenticatedUser,
+} from '@/services/api';
 import {
   INITIAL_ORGANIZATIONS,
   INITIAL_TEAM_MEMBERS,
@@ -99,7 +105,7 @@ interface HelpDeskContextValue {
   setSelectedTicketId: (id: string) => void;
   createTicketModalOpen: boolean;
   setCreateTicketModalOpen: (open: boolean) => void;
-  createTicket: (input: CreateTicketInput) => Ticket;
+  createTicket: (input: CreateTicketInput) => Promise<Ticket>;
   updateTicketStatus: (ticketId: string, status: TicketStatus) => void;
   updateTicketPriority: (ticketId: string, priority: TicketPriority) => void;
   assignTicketAgent: (ticketId: string, agentId: string | null) => void;
@@ -372,9 +378,32 @@ export function HelpDeskProvider({ children }: { children: React.ReactNode }) {
   );
 
   const createTicket = useCallback(
-    (input: CreateTicketInput): Ticket => {
+    async (input: CreateTicketInput): Promise<Ticket> => {
+      let savedTicketId: string | undefined;
+      if (!SPRING_BOOT_API_CONFIG.useMockAdapter) {
+        const token =
+          window.localStorage.getItem(AUTH_TOKEN_KEY) ||
+          window.sessionStorage.getItem(AUTH_TOKEN_KEY);
+        if (!token) {
+          throw new Error('Please sign in again before creating a ticket.');
+        }
+
+        const created = await HelpDeskApiService.tickets.create(
+          {
+            subject: input.subject.trim(),
+            description: input.description.trim(),
+            category:
+              categories.find((category) => category.id === input.categoryId)
+                ?.name || '',
+            priority: input.priority,
+          },
+          token
+        );
+        savedTicketId = created.id;
+      }
+
       const nextNum = 1001 + tickets.length;
-      const newId = `HD-${nextNum}`;
+      const newId = savedTicketId || `HD-${nextNum}`;
       const customer =
         customers.find((c) => c.id === input.customerId) ||
         customers.find((c) => c.email === currentUser.email) ||
