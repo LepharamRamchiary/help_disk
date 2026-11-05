@@ -75,4 +75,11 @@ const authenticate = (req, res, next) => {
   return next();
 };
 
-export { authenticate };
+const requirePlatformAdmin = (req, res, next) => {
+  if (req.authenticatedUser?.role !== "PLATFORM_ADMIN") {
+    return next(new ApiError(403, "Administrator access is required"));
+  }
+  return next();
+};
+
+export { authenticate, requirePlatformAdmin };

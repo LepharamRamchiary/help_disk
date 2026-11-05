@@ -21,6 +21,7 @@ export const issueToken = (user) => {
     sub: String(user.id),
     email: user.email,
     name: user.name,
+    role: user.role,
     iss: "help-dask-auth",
     iat,
     exp: iat + TOKEN_LIFETIME_SECONDS,
