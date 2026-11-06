@@ -62,4 +62,73 @@ const createTicket = asyncHandler(async (req, res) => {
     .json(new ApiResponse(201, ticket, "Ticket created successfully"));
 });
 
-export { createTicket };
+const editTicket = asyncHandler(async (req, res) => {
+  const body = req.body;
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    throw new ApiError(400, "A ticket update body is required");
+  }
+
+  const allowedFields = new Set([
+    "subject",
+    "description",
+    "category",
+    "priority",
+  ]);
+  const fields = Object.keys(body);
+  if (fields.length === 0 || fields.some((field) => !allowedFields.has(field))) {
+    throw new ApiError(400, "Provide valid ticket fields to update");
+  }
+
+  const updates = {};
+  for (const field of fields) {
+    const value = body[field];
+    if (typeof value !== "string") {
+      throw new ApiError(400, `${field} must be a string`);
+    }
+
+    const normalizedValue = value.trim();
+    if (field === "subject") {
+      if (normalizedValue.length < 5 || normalizedValue.length > 200) {
+        throw new ApiError(400, "Subject must be between 5 and 200 characters");
+      }
+      updates.subject = normalizedValue;
+    } else if (field === "description") {
+      if (normalizedValue.length < 15 || normalizedValue.length > 2000) {
+        throw new ApiError(
+          400,
+          "Description must be between 15 and 2000 characters",
+        );
+      }
+      updates.description = normalizedValue;
+    } else if (field === "category") {
+      if (!normalizedValue || normalizedValue.length > 100) {
+        throw new ApiError(400, "A valid support category is required");
+      }
+      updates.category = normalizedValue;
+    } else if (field === "priority") {
+      if (!Object.hasOwn(PRIORITIES, normalizedValue)) {
+        throw new ApiError(400, "A valid priority is required");
+      }
+      updates.priority = PRIORITIES[normalizedValue];
+    }
+  }
+
+  const ticket = await Ticket.findOneAndUpdate(
+    {
+      ticketNumber: req.params.ticketNumber,
+      requester: req.authenticatedUser.id,
+    },
+    { $set: updates },
+    { new: true, runValidators: true },
+  );
+
+  if (!ticket) {
+    throw new ApiError(404, "Ticket not found");
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, ticket, "Ticket updated successfully"));
+});
+
+export { createTicket, editTicket };
