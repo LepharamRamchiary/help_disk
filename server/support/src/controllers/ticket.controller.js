@@ -69,6 +69,15 @@ const getAllTickets = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, tickets, "Tickets retrieved successfully"));
 });
 
+const getMyTickets = asyncHandler(async (req, res) => {
+  const tickets = await Ticket.find({
+    requester: req.authenticatedUser.id,
+  }).sort({ createdAt: -1 });
+  return res
+    .status(200)
+    .json(new ApiResponse(200, tickets, "Your tickets retrieved successfully"));
+});
+
 const editTicket = asyncHandler(async (req, res) => {
   const body = req.body;
   if (!body || typeof body !== "object" || Array.isArray(body)) {
@@ -138,4 +147,4 @@ const editTicket = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, ticket, "Ticket updated successfully"));
 });
 
-export { createTicket, editTicket, getAllTickets };
+export { createTicket, editTicket, getAllTickets, getMyTickets };
