@@ -147,4 +147,29 @@ const editTicket = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, ticket, "Ticket updated successfully"));
 });
 
-export { createTicket, editTicket, getAllTickets, getMyTickets };
+const deleteTicket = asyncHandler(async (req, res) => {
+  const ticketNumber = req.params.ticketNumber;
+  const filter = { ticketNumber };
+
+  if (req.authenticatedUser.role !== "PLATFORM_ADMIN") {
+    filter.requester = req.authenticatedUser.id;
+  }
+
+  const ticket = await Ticket.findOneAndDelete(filter);
+
+  if (!ticket) {
+    throw new ApiError(404, "Ticket not found");
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, ticket, "Ticket deleted successfully"));
+});
+
+export {
+  createTicket,
+  deleteTicket,
+  editTicket,
+  getAllTickets,
+  getMyTickets,
+};
