@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   createTicket,
+  deleteTicket,
   editTicket,
   getAllTickets,
   getMyTickets,
@@ -16,6 +17,7 @@ const router = Router();
 router.post("/", authenticate, createTicket);
 router.get("/", authenticate, requirePlatformAdmin, getAllTickets);
 router.get("/my", authenticate, requireCustomer, getMyTickets);
+router.delete("/:ticketNumber", authenticate, deleteTicket);
 router.patch("/:ticketNumber", authenticate, editTicket);
 
 export default router;
