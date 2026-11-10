@@ -11,6 +11,14 @@ const PRIORITIES = {
   URGENT: "Urgent",
 };
 
+const TICKET_STATUSES = [
+  "Open",
+  "In Progress",
+  "Pending",
+  "Resolved",
+  "Closed",
+];
+
 const createTicket = asyncHandler(async (req, res) => {
   const { subject, description, category, priority = "MEDIUM" } = req.body ?? {};
   const normalizedCategory =
@@ -147,6 +155,41 @@ const editTicket = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, ticket, "Ticket updated successfully"));
 });
 
+const updateTicketStatus = asyncHandler(async (req, res) => {
+  const body = req.body;
+  if (
+    !body ||
+    typeof body !== "object" ||
+    Array.isArray(body) ||
+    Object.keys(body).length !== 1 ||
+    !Object.hasOwn(body, "status")
+  ) {
+    throw new ApiError(400, "Provide only a status to update");
+  }
+
+  const { status } = body;
+  if (typeof status !== "string" || !TICKET_STATUSES.includes(status)) {
+    throw new ApiError(
+      400,
+      `Status must be one of: ${TICKET_STATUSES.join(", ")}`,
+    );
+  }
+
+  const ticket = await Ticket.findOneAndUpdate(
+    { ticketNumber: req.params.ticketNumber },
+    { $set: { status } },
+    { new: true, runValidators: true },
+  );
+
+  if (!ticket) {
+    throw new ApiError(404, "Ticket not found");
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, ticket, "Ticket status updated successfully"));
+});
+
 const deleteTicket = asyncHandler(async (req, res) => {
   const ticketNumber = req.params.ticketNumber;
   const filter = { ticketNumber };
@@ -172,4 +215,5 @@ export {
   editTicket,
   getAllTickets,
   getMyTickets,
+  updateTicketStatus,
 };
