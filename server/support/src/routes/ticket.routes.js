@@ -15,16 +15,13 @@ import {
 
 const router = Router();
 
-router.post("/", authenticate, createTicket);
-router.get("/", authenticate, requirePlatformAdmin, getAllTickets);
-router.get("/my", authenticate, requireCustomer, getMyTickets);
-router.patch(
-  "/:ticketNumber/status",
-  authenticate,
-  requirePlatformAdmin,
-  updateTicketStatus,
-);
-router.delete("/:ticketNumber", authenticate, deleteTicket);
-router.patch("/:ticketNumber", authenticate, editTicket);
+router.route("/").post(authenticate, createTicket);
+router.route("/").get(authenticate, requirePlatformAdmin, getAllTickets);
+router.route("/my").get(authenticate, requireCustomer, getMyTickets);
+router
+  .route("/:ticketNumber/status")
+  .patch(authenticate, requirePlatformAdmin, updateTicketStatus);
+router.route("/:ticketNumber").delete(authenticate, deleteTicket);
+router.route("/:ticketNumber").patch(authenticate, editTicket);
 
 export default router;
