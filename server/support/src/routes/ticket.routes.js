@@ -5,6 +5,7 @@ import {
   editTicket,
   getAllTickets,
   getMyTickets,
+  getTodayTickets,
   updateTicketStatus,
 } from "../controllers/ticket.controller.js";
 import {
@@ -18,6 +19,8 @@ const router = Router();
 router.route("/").post(authenticate, createTicket);
 router.route("/").get(authenticate, requirePlatformAdmin, getAllTickets);
 router.route("/my").get(authenticate, requireCustomer, getMyTickets);
+router.route("/today").get(authenticate, requirePlatformAdmin, getTodayTickets);
+router.route("/now").get(authenticate, requirePlatformAdmin, getTodayTickets);
 router
   .route("/:ticketNumber/status")
   .patch(authenticate, requirePlatformAdmin, updateTicketStatus);

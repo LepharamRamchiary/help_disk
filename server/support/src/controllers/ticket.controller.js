@@ -86,6 +86,27 @@ const getMyTickets = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, tickets, "Your tickets retrieved successfully"));
 });
 
+const getTodayTickets = asyncHandler(async (req, res) => {
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+
+  const endOfDay = new Date();
+  endOfDay.setHours(23, 59, 59, 999);
+
+  const tickets = await Ticket.find({
+    createdAt: {
+      $gte: startOfDay,
+      $lte: endOfDay,
+    },
+  }).sort({ createdAt: -1 });
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, tickets, "Today's tickets retrieved successfully"));
+});
+
+const getTodaysTickets = getTodayTickets;
+
 const editTicket = asyncHandler(async (req, res) => {
   const body = req.body;
   if (!body || typeof body !== "object" || Array.isArray(body)) {
@@ -215,5 +236,7 @@ export {
   editTicket,
   getAllTickets,
   getMyTickets,
+  getTodayTickets,
+  getTodaysTickets,
   updateTicketStatus,
 };
