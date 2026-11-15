@@ -30,6 +30,7 @@ app.get("/health", (req, res) => {
 });
 
 app.use("/tickets", ticketRoutes);
+app.use("/api/tickets", ticketRoutes);
 
 // Must be last, in this order
 app.use(notFoundHandler);

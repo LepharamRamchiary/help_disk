@@ -105,6 +105,53 @@ const getTodayTickets = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, tickets, "Today's tickets retrieved successfully"));
 });
 
+const getTicketSummary = asyncHandler(async (req, res) => {
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+
+  const endOfDay = new Date();
+  endOfDay.setHours(23, 59, 59, 999);
+
+  const [totalTickets, openTickets, inProgressTickets, pendingTickets, resolvedTickets, closedTickets, todayTickets, lowPriorityTickets, mediumPriorityTickets, highPriorityTickets, urgentPriorityTickets] = await Promise.all([
+    Ticket.countDocuments(),
+    Ticket.countDocuments({ status: "Open" }),
+    Ticket.countDocuments({ status: "In Progress" }),
+    Ticket.countDocuments({ status: "Pending" }),
+    Ticket.countDocuments({ status: "Resolved" }),
+    Ticket.countDocuments({ status: "Closed" }),
+    Ticket.countDocuments({
+      createdAt: {
+        $gte: startOfDay,
+        $lte: endOfDay,
+      },
+    }),
+    Ticket.countDocuments({ priority: "Low" }),
+    Ticket.countDocuments({ priority: "Medium" }),
+    Ticket.countDocuments({ priority: "High" }),
+    Ticket.countDocuments({ priority: "Urgent" }),
+  ]);
+
+  return res.status(200).json(
+    new ApiResponse(200, {
+      totalTickets,
+      todayTickets,
+      byStatus: {
+        Open: openTickets,
+        "In Progress": inProgressTickets,
+        Pending: pendingTickets,
+        Resolved: resolvedTickets,
+        Closed: closedTickets,
+      },
+      byPriority: {
+        Low: lowPriorityTickets,
+        Medium: mediumPriorityTickets,
+        High: highPriorityTickets,
+        Urgent: urgentPriorityTickets,
+      },
+    }, "Ticket summary retrieved successfully"),
+  );
+});
+
 const getTodaysTickets = getTodayTickets;
 
 const editTicket = asyncHandler(async (req, res) => {
@@ -236,6 +283,7 @@ export {
   editTicket,
   getAllTickets,
   getMyTickets,
+  getTicketSummary,
   getTodayTickets,
   getTodaysTickets,
   updateTicketStatus,
