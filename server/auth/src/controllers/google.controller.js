@@ -19,6 +19,7 @@ const findUser = async (column, value) => {
   return rows[0];
 };
 
+// =============== Google sign-in ==========
 const googleAuth = asyncHandler(async (req, res) => {
   const { credential } = req.body ?? {};
 
