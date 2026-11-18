@@ -19,6 +19,7 @@ const TICKET_STATUSES = [
   "Closed",
 ];
 
+// ========== Create a new ticket ==========
 const createTicket = asyncHandler(async (req, res) => {
   const { subject, description, category, priority = "MEDIUM" } = req.body ?? {};
   const normalizedCategory =
@@ -70,6 +71,7 @@ const createTicket = asyncHandler(async (req, res) => {
     .json(new ApiResponse(201, ticket, "Ticket created successfully"));
 });
 
+// ========== Get all tickets ==========
 const getAllTickets = asyncHandler(async (req, res) => {
   const tickets = await Ticket.find().sort({ createdAt: -1 });
   return res
@@ -77,6 +79,7 @@ const getAllTickets = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, tickets, "Tickets retrieved successfully"));
 });
 
+// ========== Get user's tickets ==========
 const getMyTickets = asyncHandler(async (req, res) => {
   const tickets = await Ticket.find({
     requester: req.authenticatedUser.id,
@@ -86,6 +89,7 @@ const getMyTickets = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, tickets, "Your tickets retrieved successfully"));
 });
 
+// ========== Get today's tickets ==========
 const getTodayTickets = asyncHandler(async (req, res) => {
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
@@ -105,6 +109,7 @@ const getTodayTickets = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, tickets, "Today's tickets retrieved successfully"));
 });
 
+// ========== Get ticket summary ==========
 const getTicketSummary = asyncHandler(async (req, res) => {
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
@@ -154,6 +159,7 @@ const getTicketSummary = asyncHandler(async (req, res) => {
 
 const getTodaysTickets = getTodayTickets;
 
+// ================ Edit a ticket ==========
 const editTicket = asyncHandler(async (req, res) => {
   const body = req.body;
   if (!body || typeof body !== "object" || Array.isArray(body)) {
@@ -223,6 +229,7 @@ const editTicket = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, ticket, "Ticket updated successfully"));
 });
 
+// ================ Update ticket status ==========
 const updateTicketStatus = asyncHandler(async (req, res) => {
   const body = req.body;
   if (
@@ -258,6 +265,7 @@ const updateTicketStatus = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, ticket, "Ticket status updated successfully"));
 });
 
+// ================ Delete a ticket ==========
 const deleteTicket = asyncHandler(async (req, res) => {
   const ticketNumber = req.params.ticketNumber;
   const filter = { ticketNumber };

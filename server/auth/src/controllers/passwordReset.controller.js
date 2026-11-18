@@ -40,6 +40,7 @@ const sendResetEmail = async (user, token) => {
   }
 };
 
+// ================ Send password changed email ==========
 const sendPasswordChangedEmail = async (user) => {
   try {
     const mail = passwordChangedTemplate({ name: user.name });
@@ -53,6 +54,7 @@ const sendPasswordChangedEmail = async (user) => {
   }
 };
 
+// ================ Send password reset link ==========
 const forgotPassword = asyncHandler(async (req, res) => {
   const email = normalizeEmail(req.body?.email);
 
@@ -102,6 +104,7 @@ const forgotPassword = asyncHandler(async (req, res) => {
     );
 });
 
+// ================ Reset password ==========
 const resetPassword = asyncHandler(async (req, res) => {
   const { token, password } = req.body ?? {};
 

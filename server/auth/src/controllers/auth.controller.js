@@ -23,6 +23,7 @@ const normalizeEmail = (email) =>
 
 const isValidEmail = (email) => email.length <= 191 && EMAIL_REGEX.test(email);
 
+// ================ Create a new user ==========
 const createUser = async (req, res, message, createSession = false) => {
   const { name, email, password } = req.body ?? {};
   const normalizedName = typeof name === "string" ? name.trim() : "";
@@ -83,14 +84,17 @@ const createUser = async (req, res, message, createSession = false) => {
   }
 };
 
+// ================ Register a new user ==========
 const register = asyncHandler((req, res) =>
   createUser(req, res, "User created successfully", true),
 );
 
+// ================ Add a new user (admin only) ==========
 const addUser = asyncHandler((req, res) =>
   createUser(req, res, "User added successfully"),
 );
 
+// ================ Login a user ==========
 const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body ?? {};
   const normalizedEmail = normalizeEmail(email);
@@ -156,6 +160,7 @@ const login = asyncHandler(async (req, res) => {
   );
 });
 
+// ================ Get the authenticated user's profile ==========
 const authenticate = asyncHandler(async (req, res, next) => {
   const authorization = req.headers.authorization;
   const [scheme, token, extra] =
@@ -233,6 +238,7 @@ const authenticate = asyncHandler(async (req, res, next) => {
   return next();
 });
 
+// ================ Get the authenticated user's profile ==========
 const getMe = asyncHandler(async (req, res) => {
   const { id, name, email, role, createdAt } = req.authenticatedUser;
 
@@ -247,6 +253,7 @@ const getMe = asyncHandler(async (req, res) => {
     );
 });
 
+// ================ Require admin access ==========
 const requireAdmin = asyncHandler(async (req, res, next) => {
   if (req.authenticatedUser.role !== PLATFORM_ADMIN_ROLE) {
     throw new ApiError(403, "Administrator access is required");
@@ -255,6 +262,7 @@ const requireAdmin = asyncHandler(async (req, res, next) => {
   return next();
 });
 
+// ================ Get all users ==========
 const getAllUsers = asyncHandler(async (req, res) => {
   const [users] = await pool.execute(
     "SELECT id, name, email, createdAt FROM users ORDER BY id",
@@ -265,6 +273,7 @@ const getAllUsers = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, users, "Users retrieved successfully"));
 });
 
+// ================ Delete a user ==========
 const deleteUser = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
@@ -287,6 +296,7 @@ const deleteUser = asyncHandler(async (req, res) => {
     );
 });
 
+// ================ Logout a user ==========
 const logout = asyncHandler(async (req, res) => {
   return res
     .status(200)
