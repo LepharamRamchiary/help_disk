@@ -24,6 +24,7 @@ import {
   HelpDeskApiService,
   SPRING_BOOT_API_CONFIG,
   type AuthenticatedUser,
+  type SupportTicketRecord,
 } from '@/services/api';
 import {
   INITIAL_ORGANIZATIONS,
@@ -70,6 +71,91 @@ interface CreateTicketInput {
   dueDate?: string;
   tags?: string[];
   attachments?: Attachment[];
+}
+
+const SUPPORT_STATUS_MAP: Record<SupportTicketRecord['status'], TicketStatus> = {
+  Open: 'OPEN',
+  'In Progress': 'IN_PROGRESS',
+  Pending: 'WAITING_FOR_CUSTOMER',
+  Resolved: 'RESOLVED',
+  Closed: 'CLOSED',
+};
+
+const SUPPORT_PRIORITY_MAP: Record<SupportTicketRecord['priority'], TicketPriority> = {
+  Low: 'LOW',
+  Medium: 'MEDIUM',
+  High: 'HIGH',
+  Urgent: 'URGENT',
+};
+
+function toHelpDeskTicket(
+  ticket: SupportTicketRecord,
+  user: User,
+  categories: Category[],
+  customers: Customer[]
+): Ticket {
+  const customer = customers.find(
+    (item) => item.email.toLowerCase() === ticket.requesterEmail.toLowerCase()
+  );
+  const category = categories.find(
+    (item) => item.name.toLowerCase() === ticket.category.toLowerCase()
+  );
+  const initials = ticket.requesterName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0].toUpperCase())
+    .join('');
+  const createdAt = new Date(ticket.createdAt);
+  const updatedAt = new Date(ticket.updatedAt);
+  const createdAtLabel = Number.isNaN(createdAt.getTime())
+    ? ticket.createdAt
+    : createdAt.toLocaleString();
+  const updatedAtLabel = Number.isNaN(updatedAt.getTime())
+    ? ticket.updatedAt
+    : updatedAt.toLocaleString();
+
+  return {
+    id: ticket.ticketNumber,
+    organizationId: user.organizationId,
+    subject: ticket.subject,
+    description: ticket.description,
+    status: SUPPORT_STATUS_MAP[ticket.status],
+    priority: SUPPORT_PRIORITY_MAP[ticket.priority],
+    categoryId: category?.id || ticket.category,
+    categoryName: ticket.category,
+    customerId: ticket.requester,
+    customerName: ticket.requesterName,
+    customerEmail: ticket.requesterEmail,
+    customerOrganization: customer?.organization || user.organizationName,
+    customerInitials: customer?.avatarInitials || initials,
+    assignedAgentId: null,
+    assignedAgentName: null,
+    assignedAgentInitials: null,
+    createdAt: createdAtLabel,
+    updatedAt: updatedAtLabel,
+    firstResponseDeadline: '',
+    resolutionDeadline: '',
+    firstResponseRemainingMinutes: 0,
+    resolutionRemainingMinutes: 0,
+    slaStatus: ticket.status === 'Resolved' || ticket.status === 'Closed' ? 'COMPLETED' : 'WITHIN_SLA',
+    tags: [],
+    messages: [
+      {
+        id: `initial-${ticket.ticketNumber}`,
+        ticketId: ticket.ticketNumber,
+        authorId: ticket.requester,
+        authorName: ticket.requesterName,
+        authorRole: 'CUSTOMER',
+        authorInitials: customer?.avatarInitials || initials,
+        body: ticket.description,
+        isInternalNote: false,
+        createdAt: createdAtLabel,
+        attachments: [],
+      },
+    ],
+    activities: [],
+  };
 }
 
 interface HelpDeskContextValue {
@@ -170,6 +256,7 @@ export function HelpDeskProvider({ children }: { children: React.ReactNode }) {
   const [currentOrgId, setCurrentOrgId] = useState<string>('org-1');
   const [teamMembers, setTeamMembers] = useState<User[]>(INITIAL_TEAM_MEMBERS);
   const [currentUser, setCurrentUser] = useState<User>(INITIAL_TEAM_MEMBERS[0]); // Alex Morgan (Company Admin / Manager)
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentView, setCurrentView] = useState<PageView>('landing');
 
   const [sidebarStyle, setSidebarStyle] = useState<'light' | 'dark-emerald'>('light');
@@ -209,6 +296,7 @@ export function HelpDeskProvider({ children }: { children: React.ReactNode }) {
 
   const applyAuthenticatedUser = useCallback((authUser: AuthenticatedUser) => {
     const user = toHelpDeskUser(authUser);
+    setIsAuthenticated(true);
     setCurrentUser(user);
     setCurrentView(
       user.role === 'CUSTOMER'
@@ -269,6 +357,52 @@ export function HelpDeskProvider({ children }: { children: React.ReactNode }) {
     };
   }, [addToast, applyAuthenticatedUser]);
 
+  useEffect(() => {
+    if (
+      SPRING_BOOT_API_CONFIG.useMockAdapter ||
+      !isAuthenticated ||
+      currentUser.role !== 'CUSTOMER'
+    ) {
+      return;
+    }
+
+    let active = true;
+    const customerEmail = currentUser.email.toLowerCase();
+    const isCurrentCustomerTicket = (ticket: Ticket) =>
+      ticket.customerEmail.toLowerCase() === customerEmail;
+
+    setTickets((previous) => previous.filter((ticket) => !isCurrentCustomerTicket(ticket)));
+    HelpDeskApiService.tickets
+      .my()
+      .then((records) => {
+        if (!active) return;
+
+        const customerTickets = records.map((record) =>
+          toHelpDeskTicket(record, currentUser, categories, customers)
+        );
+        const persistedIds = new Set(customerTickets.map((ticket) => ticket.id));
+        setTickets((previous) => [
+          ...customerTickets,
+          ...previous.filter(
+            (ticket) => isCurrentCustomerTicket(ticket) && !persistedIds.has(ticket.id)
+          ),
+          ...previous.filter((ticket) => !isCurrentCustomerTicket(ticket)),
+        ]);
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        addToast(
+          'Could not load saved tickets',
+          error instanceof Error ? error.message : 'Please refresh and try again.',
+          'error'
+        );
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [addToast, categories, currentUser, customers, isAuthenticated]);
+
   const navigateTo = useCallback(
     (view: PageView, options?: { ticketId?: string; customerId?: string }) => {
       if (options?.ticketId) {
@@ -291,6 +425,7 @@ export function HelpDeskProvider({ children }: { children: React.ReactNode }) {
       if (!targetUser) {
         targetUser = INITIAL_TEAM_MEMBERS.find((u) => u.role === role) || INITIAL_TEAM_MEMBERS[0];
       }
+      setIsAuthenticated(false);
       setCurrentUser(targetUser);
 
       if (role === 'CUSTOMER') {
@@ -332,6 +467,7 @@ export function HelpDeskProvider({ children }: { children: React.ReactNode }) {
       );
       return;
     }
+    setIsAuthenticated(false);
     setCurrentView('login');
     addToast('Signed out', 'Your session has been securely closed.', 'info');
   }, [addToast]);
@@ -364,7 +500,7 @@ export function HelpDeskProvider({ children }: { children: React.ReactNode }) {
   const createTicket = useCallback(
     async (input: CreateTicketInput): Promise<Ticket> => {
       let savedTicketId: string | undefined;
-      if (!SPRING_BOOT_API_CONFIG.useMockAdapter) {
+      if (!SPRING_BOOT_API_CONFIG.useMockAdapter && isAuthenticated) {
         const created = await HelpDeskApiService.tickets.create(
           {
             subject: input.subject.trim(),
@@ -476,7 +612,16 @@ export function HelpDeskProvider({ children }: { children: React.ReactNode }) {
       addToast(`Ticket ${newId} Created`, `"${newTicket.subject}" has been logged in the queue.`);
       return newTicket;
     },
-    [tickets.length, customers, currentUser, categories, teamMembers, currentOrgId, addToast]
+    [
+      tickets.length,
+      customers,
+      currentUser,
+      categories,
+      teamMembers,
+      currentOrgId,
+      isAuthenticated,
+      addToast,
+    ]
   );
 
   const updateTicketStatus = useCallback(

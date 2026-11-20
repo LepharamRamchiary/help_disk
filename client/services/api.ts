@@ -31,6 +31,23 @@ export interface AuthSession {
   user: AuthenticatedUser;
 }
 
+export interface SupportTicketRecord {
+  ticketNumber: string;
+  subject: string;
+  description: string;
+  category: string;
+  priority: 'Low' | 'Medium' | 'High' | 'Urgent';
+  requester: string;
+  requesterName: string;
+  requesterEmail: string;
+  status: 'Open' | 'In Progress' | 'Pending' | 'Resolved' | 'Closed';
+  createdAt: string;
+  updatedAt: string;
+}
+
+const SUPPORT_PRIORITIES = ['Low', 'Medium', 'High', 'Urgent'] as const;
+const SUPPORT_STATUSES = ['Open', 'In Progress', 'Pending', 'Resolved', 'Closed'] as const;
+
 export class AuthApiError extends Error {
   constructor(
     message: string,
@@ -117,6 +134,47 @@ function parseAuthSession(value: unknown): AuthSession {
 
   return {
     user: parseAuthenticatedUser(value.user),
+  };
+}
+
+function parseSupportTicket(value: unknown): SupportTicketRecord {
+  const priority =
+    isRecord(value) &&
+    typeof value.priority === 'string' &&
+    SUPPORT_PRIORITIES.find((item) => item === value.priority);
+  const status =
+    isRecord(value) &&
+    typeof value.status === 'string' &&
+    SUPPORT_STATUSES.find((item) => item === value.status);
+  if (
+    !isRecord(value) ||
+    typeof value.ticketNumber !== 'string' ||
+    typeof value.subject !== 'string' ||
+    typeof value.description !== 'string' ||
+    typeof value.category !== 'string' ||
+    !priority ||
+    typeof value.requester !== 'string' ||
+    typeof value.requesterName !== 'string' ||
+    typeof value.requesterEmail !== 'string' ||
+    !status ||
+    typeof value.createdAt !== 'string' ||
+    typeof value.updatedAt !== 'string'
+  ) {
+    throw new Error('The support service returned an invalid ticket.');
+  }
+
+  return {
+    ticketNumber: value.ticketNumber,
+    subject: value.subject,
+    description: value.description,
+    category: value.category,
+    priority,
+    requester: value.requester,
+    requesterName: value.requesterName,
+    requesterEmail: value.requesterEmail,
+    status,
+    createdAt: value.createdAt,
+    updatedAt: value.updatedAt,
   };
 }
 
@@ -309,6 +367,34 @@ export const HelpDeskApiService = {
       })),
   },
   tickets: {
+    my: async (): Promise<SupportTicketRecord[]> => {
+      let response: Response;
+      try {
+        response = await fetch(
+          `${SPRING_BOOT_API_CONFIG.baseUrl.replace(/\/$/, '')}/support/tickets/my`,
+          { credentials: 'include' }
+        );
+      } catch {
+        throw new Error('Unable to reach the support service. Please try again.');
+      }
+
+      let body: unknown;
+      try {
+        body = await response.json();
+      } catch {
+        throw new Error('The support service returned an invalid response.');
+      }
+
+      if (!isRecord(body) || !response.ok || body.success !== true || !Array.isArray(body.data)) {
+        throw new Error(
+          isRecord(body) && typeof body.message === 'string'
+            ? body.message
+            : 'Could not load your support tickets.'
+        );
+      }
+
+      return body.data.map(parseSupportTicket);
+    },
     create: async (
       input: {
         subject: string;
