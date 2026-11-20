@@ -13,7 +13,25 @@ const app = express();
 app.set("trust proxy", 1);
 
 // CORS configuration
-app.use(cors());
+const allowedOrigins = new Set(
+  (process.env.CORS_ALLOWED_ORIGINS || "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.has(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+  }),
+);
 
 // Body parsers
 app.use(express.json({ limit: "20mb" }));
