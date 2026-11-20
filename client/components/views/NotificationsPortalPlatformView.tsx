@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useHelpDesk } from '@/context/HelpDeskContext';
 import { Organization, Attachment } from '@/types/helpdesk';
 import {
@@ -179,6 +179,7 @@ export function NotificationsView() {
 // ============================================================================
 export function CustomerPortalView() {
   const {
+    currentUser,
     tickets,
     setCreateTicketModalOpen,
     addTicketMessage,
@@ -191,21 +192,20 @@ export function CustomerPortalView() {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
 
   // Customer Profile Settings State
-  const [custName, setCustName] = useState('Elena Rostova');
-  const [custEmail, setCustEmail] = useState('elena.rostova@nordicbank.io');
+  const [custName, setCustName] = useState(currentUser.fullName);
+  const [custEmail, setCustEmail] = useState(currentUser.email);
   const [custTimezone, setCustTimezone] = useState('CET (UTC+1 — Stockholm)');
   const [emailUpdates, setEmailUpdates] = useState(true);
 
-  // Only show tickets belonging to Elena Rostova (cust-1) or created during this session
+  useEffect(() => {
+    setCustName(currentUser.fullName);
+    setCustEmail(currentUser.email);
+  }, [currentUser.email, currentUser.fullName]);
+
   const myCustomerTickets = useMemo(
     () =>
-      tickets.filter(
-        (t) =>
-          t.customerId === 'cust-1' ||
-          t.customerEmail === 'elena.rostova@nordicbank.io' ||
-          t.id.startsWith('HD-101')
-      ),
-    [tickets]
+      tickets.filter((t) => t.customerEmail.toLowerCase() === currentUser.email.toLowerCase()),
+    [currentUser.email, tickets]
   );
 
   const activeTicket = useMemo(
