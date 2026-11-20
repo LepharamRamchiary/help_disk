@@ -405,9 +405,15 @@ export function HelpDeskProvider({ children }: { children: React.ReactNode }) {
       const nextNum = 1001 + tickets.length;
       const newId = savedTicketId || `HD-${nextNum}`;
       const customer =
-        customers.find((c) => c.id === input.customerId) ||
-        customers.find((c) => c.email === currentUser.email) ||
-        customers[0];
+        currentUser.role === 'CUSTOMER'
+          ? customers.find((c) => c.email.toLowerCase() === currentUser.email.toLowerCase()) || {
+              ...customers[0],
+              id: currentUser.id,
+              fullName: currentUser.fullName,
+              email: currentUser.email,
+              avatarInitials: currentUser.avatarInitials,
+            }
+          : customers.find((c) => c.id === input.customerId) || customers[0];
       const category = categories.find((c) => c.id === input.categoryId) || categories[0];
       const agent = input.assignedAgentId
         ? teamMembers.find((m) => m.id === input.assignedAgentId) || null
