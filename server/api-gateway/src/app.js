@@ -170,6 +170,7 @@ app.use((req, res, next) => {
       "Access-Control-Allow-Headers",
       "Authorization, Content-Type",
     );
+    res.setHeader("Access-Control-Allow-Credentials", "true");
 
     res.setHeader("Access-Control-Max-Age", "86400");
   }

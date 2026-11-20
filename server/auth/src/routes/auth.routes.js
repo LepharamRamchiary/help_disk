@@ -30,6 +30,6 @@ router.route("/users").post(authenticate, addUser);
 router.route("/users").get(authenticate, getAllUsers);
 router.route("/users/:id").delete(authenticate, requireAdmin, deleteUser);
 router.route("/me").get(authenticate, getMe);
-router.route("/logout").post(authenticate, logout);
+router.route("/logout").post(logout);
 
 export default router;

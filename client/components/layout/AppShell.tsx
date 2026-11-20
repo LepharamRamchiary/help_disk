@@ -1147,7 +1147,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 NEXT_PUBLIC_USE_MOCK_API=false
               </code>{" "}
               is set, requests route directly to the Spring Boot controllers
-              below with JWT Bearer authentication and multi-tenant{" "}
+              below with an HttpOnly session cookie and multi-tenant{" "}
               <code className="font-mono">X-Organization-Id</code> headers.
             </p>
           </div>

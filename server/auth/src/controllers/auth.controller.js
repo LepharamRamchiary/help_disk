@@ -12,6 +12,11 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { PLATFORM_ADMIN_ROLE } from "../constants.js";
 import { notifyRegistration } from "../utils/notifyRegistration.js";
+import {
+  clearAuthCookie,
+  getAuthToken,
+  setAuthCookie,
+} from "../utils/authCookie.js";
 
 const scrypt = promisify(scryptCallback);
 
@@ -66,12 +71,16 @@ const createUser = async (req, res, message, createSession = false) => {
 
     void notifyRegistration(user, createSession ? "email" : "added by admin");
 
+    if (createSession) {
+      setAuthCookie(res, issueToken(user).token);
+    }
+
     return res
       .status(201)
       .json(
         new ApiResponse(
           201,
-          createSession ? { ...issueToken(user), user } : user,
+          createSession ? { user } : user,
           message,
         ),
       );
@@ -96,7 +105,7 @@ const addUser = asyncHandler((req, res) =>
 
 // ================ Login a user ==========
 const login = asyncHandler(async (req, res) => {
-  const { email, password } = req.body ?? {};
+  const { email, password, rememberMe = true } = req.body ?? {};
   const normalizedEmail = normalizeEmail(email);
 
   if (!isValidEmail(normalizedEmail)) {
@@ -142,11 +151,11 @@ const login = asyncHandler(async (req, res) => {
     throw new ApiError(401, "Invalid email or password");
   }
 
+  setAuthCookie(res, issueToken(user).token, rememberMe !== false);
   return res.status(200).json(
     new ApiResponse(
       200,
       {
-        ...issueToken(user),
         user: {
           id: user.id,
           name: user.name,
@@ -162,12 +171,10 @@ const login = asyncHandler(async (req, res) => {
 
 // ================ Get the authenticated user's profile ==========
 const authenticate = asyncHandler(async (req, res, next) => {
-  const authorization = req.headers.authorization;
-  const [scheme, token, extra] =
-    typeof authorization === "string" ? authorization.split(" ") : [];
+  const token = getAuthToken(req);
 
-  if (scheme !== "Bearer" || !token || extra) {
-    throw new ApiError(401, "A valid bearer token is required");
+  if (!token) {
+    throw new ApiError(401, "A valid session is required");
   }
 
   const secret = process.env.AUTH_JWT_SECRET;
@@ -298,13 +305,14 @@ const deleteUser = asyncHandler(async (req, res) => {
 
 // ================ Logout a user ==========
 const logout = asyncHandler(async (req, res) => {
+  clearAuthCookie(res);
   return res
     .status(200)
     .json(
       new ApiResponse(
         200,
         null,
-        "Logout successful. Remove the bearer token from the client.",
+        "Logout successful.",
       ),
     );
 });

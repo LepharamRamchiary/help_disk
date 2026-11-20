@@ -39,8 +39,6 @@ import {
 
 export type SimulationState = 'NORMAL' | 'LOADING' | 'EMPTY' | 'ERROR';
 
-const AUTH_TOKEN_KEY = 'helpdesk.auth.token';
-
 function toHelpDeskUser(user: AuthenticatedUser): User {
   const fullName = user.name?.trim() || user.email.split('@')[0];
   const role = user.role;
@@ -83,7 +81,7 @@ interface HelpDeskContextValue {
   loginWithPassword: (email: string, password: string, rememberMe: boolean) => Promise<void>;
   registerAccount: (name: string, email: string, password: string) => Promise<void>;
   loginWithGoogle: (credential: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 
   // Organization & Theme
   organizations: Organization[];
@@ -221,64 +219,42 @@ export function HelpDeskProvider({ children }: { children: React.ReactNode }) {
     );
   }, []);
 
-  const persistSession = useCallback(
-    (token: string, rememberMe: boolean) => {
-      window.localStorage.removeItem(AUTH_TOKEN_KEY);
-      window.sessionStorage.removeItem(AUTH_TOKEN_KEY);
-      const storage = rememberMe ? window.localStorage : window.sessionStorage;
-      storage.setItem(AUTH_TOKEN_KEY, token);
-    },
-    []
-  );
-
   const loginWithPassword = useCallback(
     async (email: string, password: string, rememberMe: boolean) => {
-      const session = await AuthApiService.login(email, password);
-      persistSession(session.token, rememberMe);
+      const session = await AuthApiService.login(email, password, rememberMe);
       applyAuthenticatedUser(session.user);
       addToast('Welcome back to HelpDesk Pro', `Signed in as ${session.user.email}.`);
     },
-    [addToast, applyAuthenticatedUser, persistSession]
+    [addToast, applyAuthenticatedUser]
   );
 
   const registerAccount = useCallback(
     async (name: string, email: string, password: string) => {
       const session = await AuthApiService.register(name, email, password);
-      persistSession(session.token, true);
       applyAuthenticatedUser(session.user);
       addToast('Account created', `Welcome to HelpDesk Pro, ${session.user.name || session.user.email}.`);
     },
-    [addToast, applyAuthenticatedUser, persistSession]
+    [addToast, applyAuthenticatedUser]
   );
 
   const loginWithGoogle = useCallback(
     async (credential: string) => {
       const session = await AuthApiService.google(credential);
-      persistSession(session.token, true);
       applyAuthenticatedUser(session.user);
       addToast('Google sign-in successful', `Signed in as ${session.user.email}.`);
     },
-    [addToast, applyAuthenticatedUser, persistSession]
+    [addToast, applyAuthenticatedUser]
   );
 
   useEffect(() => {
     let active = true;
-    const token =
-      window.localStorage.getItem(AUTH_TOKEN_KEY) ||
-      window.sessionStorage.getItem(AUTH_TOKEN_KEY);
-    if (!token) return;
-
-    AuthApiService.me(token)
+    AuthApiService.me()
       .then((user) => {
         if (active) applyAuthenticatedUser(user);
       })
       .catch((error: unknown) => {
         if (!active) return;
-        if (error instanceof AuthApiError && (error.status === 401 || error.status === 404)) {
-          window.localStorage.removeItem(AUTH_TOKEN_KEY);
-          window.sessionStorage.removeItem(AUTH_TOKEN_KEY);
-          setCurrentView('login');
-          addToast('Session expired', 'Please sign in again to continue.', 'info');
+        if (error instanceof AuthApiError && error.status === 401) {
           return;
         }
 
@@ -345,9 +321,17 @@ export function HelpDeskProvider({ children }: { children: React.ReactNode }) {
     [teamMembers, currentView, addToast]
   );
 
-  const logout = useCallback(() => {
-    window.localStorage.removeItem(AUTH_TOKEN_KEY);
-    window.sessionStorage.removeItem(AUTH_TOKEN_KEY);
+  const logout = useCallback(async () => {
+    try {
+      await AuthApiService.logout();
+    } catch (error) {
+      addToast(
+        'Could not sign out',
+        error instanceof Error ? error.message : 'Please try again.',
+        'error'
+      );
+      return;
+    }
     setCurrentView('login');
     addToast('Signed out', 'Your session has been securely closed.', 'info');
   }, [addToast]);
@@ -381,13 +365,6 @@ export function HelpDeskProvider({ children }: { children: React.ReactNode }) {
     async (input: CreateTicketInput): Promise<Ticket> => {
       let savedTicketId: string | undefined;
       if (!SPRING_BOOT_API_CONFIG.useMockAdapter) {
-        const token =
-          window.localStorage.getItem(AUTH_TOKEN_KEY) ||
-          window.sessionStorage.getItem(AUTH_TOKEN_KEY);
-        if (!token) {
-          throw new Error('Please sign in again before creating a ticket.');
-        }
-
         const created = await HelpDeskApiService.tickets.create(
           {
             subject: input.subject.trim(),
@@ -396,8 +373,7 @@ export function HelpDeskProvider({ children }: { children: React.ReactNode }) {
               categories.find((category) => category.id === input.categoryId)
                 ?.name || '',
             priority: input.priority,
-          },
-          token
+          }
         );
         savedTicketId = created.id;
       }
