@@ -11,6 +11,15 @@ if (!Number.isInteger(PORT) || PORT <= 0) {
 
 const startServer = async () => {
   try {
+    if (
+      !process.env.AUTH_JWT_SECRET ||
+      Buffer.byteLength(process.env.AUTH_JWT_SECRET) < 32
+    ) {
+      throw new Error(
+        "AUTH_JWT_SECRET must match the auth service and contain at least 32 bytes",
+      );
+    }
+
     await connectDB();
 
     const server = app.listen(PORT, () => {

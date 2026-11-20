@@ -28,9 +28,6 @@ export interface AuthenticatedUser {
 }
 
 export interface AuthSession {
-  token: string;
-  tokenType: string;
-  expiresIn: number;
   user: AuthenticatedUser;
 }
 
@@ -79,6 +76,7 @@ async function authRequest(path: string, options: RequestInit = {}): Promise<unk
       `${SPRING_BOOT_API_CONFIG.baseUrl.replace(/\/$/, '')}/auth${path}`,
       {
         ...options,
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
           ...(options.headers || {}),
@@ -113,29 +111,21 @@ async function authRequest(path: string, options: RequestInit = {}): Promise<unk
 }
 
 function parseAuthSession(value: unknown): AuthSession {
-  if (
-    !isRecord(value) ||
-    typeof value.token !== 'string' ||
-    typeof value.tokenType !== 'string' ||
-    typeof value.expiresIn !== 'number'
-  ) {
+  if (!isRecord(value)) {
     throw new AuthApiError('The auth service returned an invalid session.', 502);
   }
 
   return {
-    token: value.token,
-    tokenType: value.tokenType,
-    expiresIn: value.expiresIn,
     user: parseAuthenticatedUser(value.user),
   };
 }
 
 export const AuthApiService = {
-  login: async (email: string, password: string): Promise<AuthSession> =>
+  login: async (email: string, password: string, rememberMe: boolean): Promise<AuthSession> =>
     parseAuthSession(
       await authRequest('/login', {
         method: 'POST',
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, rememberMe }),
       })
     ),
   register: async (name: string, email: string, password: string): Promise<AuthSession> =>
@@ -164,12 +154,11 @@ export const AuthApiService = {
       body: JSON.stringify({ token, password }),
     });
   },
-  me: async (token: string): Promise<AuthenticatedUser> =>
-    parseAuthenticatedUser(
-      await authRequest('/me', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-    ),
+  me: async (): Promise<AuthenticatedUser> =>
+    parseAuthenticatedUser(await authRequest('/me')),
+  logout: async (): Promise<void> => {
+    await authRequest('/logout', { method: 'POST' });
+  },
 };
 
 export interface ApiEndpointSpec {
@@ -186,14 +175,14 @@ export const SPRING_BOOT_ENDPOINTS: ApiEndpointSpec[] = [
     method: 'POST',
     path: '/api/v1/auth/login',
     springController: 'AuthController#authenticateUser',
-    description: 'Authenticates credentials and returns JWT Bearer token + organization claims.',
+    description: 'Authenticates credentials and sets an HttpOnly session cookie.',
   },
   {
     module: 'Authentication',
     method: 'POST',
     path: '/api/v1/auth/register',
     springController: 'AuthController#registerTenantOrUser',
-    description: 'Provisions new tenant workspace or joins existing organization via domain token.',
+    description: 'Creates an account and sets an HttpOnly session cookie.',
   },
   {
     module: 'Authentication',
@@ -326,8 +315,7 @@ export const HelpDeskApiService = {
         description: string;
         category: string;
         priority: TicketPriority;
-      },
-      token: string
+      }
     ): Promise<{ id: string }> => {
       let response: Response;
       try {
@@ -337,8 +325,8 @@ export const HelpDeskApiService = {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
             },
+            credentials: 'include',
             body: JSON.stringify(input),
           }
         );

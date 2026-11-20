@@ -1,17 +1,16 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { ApiError } from "../utils/ApiError.js";
+import { getAuthToken } from "../utils/authCookie.js";
 
 const ID_REGEX = /^[1-9]\d*$/;
 const BASE64URL_REGEX = /^[A-Za-z0-9_-]+$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const authenticate = (req, res, next) => {
-  const authorization = req.headers.authorization;
-  const [scheme, token, extra] =
-    typeof authorization === "string" ? authorization.split(" ") : [];
+  const token = getAuthToken(req);
 
-  if (scheme !== "Bearer" || !token || extra) {
-    return next(new ApiError(401, "A valid bearer token is required"));
+  if (!token) {
+    return next(new ApiError(401, "A valid session is required"));
   }
 
   const secret = process.env.AUTH_JWT_SECRET;

@@ -5,6 +5,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { notifyRegistration } from "../utils/notifyRegistration.js";
+import { setAuthCookie } from "../utils/authCookie.js";
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -96,11 +97,11 @@ const googleAuth = asyncHandler(async (req, res) => {
     void notifyRegistration(user, "google");
   }
 
+  setAuthCookie(res, issueToken(user).token);
   return res.status(200).json(
     new ApiResponse(
       200,
       {
-        ...issueToken(user),
         user: {
           id: user.id,
           name: user.name,
