@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useHelpDesk } from '@/context/HelpDeskContext';
 import { TicketPriority, Attachment } from '@/types/helpdesk';
+import { filesToAttachments, mergeAttachments } from '@/lib/attachments';
 import { Modal, PageHeader } from '@/components/ui/design-system';
 import {
   UploadCloud,
@@ -10,7 +11,6 @@ import {
   X,
   AlertCircle,
   CheckCircle2,
-  Paperclip,
   ArrowLeft,
 } from 'lucide-react';
 
@@ -46,45 +46,19 @@ export function CreateTicketForm({
 
   const MAX_DESC_CHARS = 2000;
 
-  const handleFileChange = (files: FileList | null) => {
+  const handleFileChange = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     setErrors((prev) => ({ ...prev, file: undefined }));
 
-    const newAttachments: Attachment[] = [];
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      if (file.size > 10 * 1024 * 1024) {
-        setErrors((prev) => ({
-          ...prev,
-          file: `File "${file.name}" exceeds the 10 MB maximum file size limit.`,
-        }));
-        continue;
-      }
-      const kb = Math.max(1, Math.round(file.size / 1024));
-      newAttachments.push({
-        id: `att-${Date.now()}-${i}`,
-        fileName: file.name,
-        fileSize: kb > 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${kb} KB`,
-        fileType: file.name.endsWith('.png') || file.name.endsWith('.jpg') ? 'image' : 'log',
-        uploadedAt: 'Just now',
-        uploadedBy: currentUser.fullName,
-      });
+    try {
+      const newAttachments = await filesToAttachments(files, currentUser.fullName);
+      setAttachments(mergeAttachments(attachments, newAttachments));
+    } catch (error) {
+      setErrors((prev) => ({
+        ...prev,
+        file: error instanceof Error ? error.message : 'Could not attach the selected files.',
+      }));
     }
-    setAttachments((prev) => [...prev, ...newAttachments]);
-  };
-
-  const handleAddSampleAttachment = () => {
-    setAttachments((prev) => [
-      ...prev,
-      {
-        id: `att-sample-${Date.now()}`,
-        fileName: 'diagnostic-session-trace-2026.log',
-        fileSize: '142 KB',
-        fileType: 'log',
-        uploadedAt: 'Just now',
-        uploadedBy: currentUser.fullName,
-      },
-    ]);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -333,14 +307,6 @@ export function CreateTicketForm({
           <span className="text-xs font-semibold text-[#111827]">
             Attachments & Diagnostic Logs
           </span>
-          <button
-            type="button"
-            onClick={handleAddSampleAttachment}
-            className="text-xs font-medium text-[#047857] hover:underline inline-flex items-center gap-1"
-          >
-            <Paperclip className="w-3 h-3" />
-            <span>+ Attach Sample Diagnostic Log</span>
-          </button>
         </div>
 
         <div
@@ -368,14 +334,17 @@ export function CreateTicketForm({
               <input
                 type="file"
                 multiple
-                onChange={(e) => handleFileChange(e.target.files)}
+                onChange={(e) => {
+                  void handleFileChange(e.target.files);
+                  e.currentTarget.value = '';
+                }}
                 className="sr-only"
-                accept=".pdf,.png,.jpg,.jpeg,.log,.txt,.har,.xml,.json"
+                accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.log,.txt,.har,.xml,.json"
               />
             </label>
           </p>
           <p className="text-[11px] text-[#64748B] mt-1">
-            Accepted formats: PDF, PNG, JPG, HAR, XML, LOG · Maximum file size: 10 MB per file
+            Accepted formats: PDF, PNG, JPG, GIF, WEBP, HAR, XML, LOG · Maximum 4 MB per file and 6 MB per upload
           </p>
         </div>
 
@@ -394,7 +363,15 @@ export function CreateTicketForm({
                 className="flex items-center justify-between px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-xs"
               >
                 <div className="flex items-center gap-2 min-w-0">
-                  <FileText className="w-4 h-4 text-[#047857] shrink-0" />
+                  {att.fileType === 'image' && att.dataUrl ? (
+                    <img
+                      src={att.dataUrl}
+                      alt={att.fileName}
+                      className="w-10 h-10 rounded object-cover shrink-0"
+                    />
+                  ) : (
+                    <FileText className="w-4 h-4 text-[#047857] shrink-0" />
+                  )}
                   <span className="font-mono font-medium text-[#111827] truncate">
                     {att.fileName}
                   </span>

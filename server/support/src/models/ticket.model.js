@@ -2,9 +2,44 @@ import mongoose from "mongoose";
 
 const attachmentSchema = new mongoose.Schema(
   {
-    url: {
+    id: {
       type: String,
       required: true,
+    },
+    fileName: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 255,
+    },
+    fileSize: {
+      type: String,
+      required: true,
+    },
+    fileType: {
+      type: String,
+      enum: ["image", "pdf", "log", "archive"],
+      required: true,
+    },
+    mimeType: {
+      type: String,
+      required: true,
+    },
+    dataUrl: {
+      type: String,
+      required: true,
+    },
+    uploadedAt: {
+      type: String,
+      required: true,
+    },
+    uploadedBy: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    url: {
+      type: String,
       trim: true,
     },
   },
@@ -41,13 +76,17 @@ const messageSchema = new mongoose.Schema(
     },
     body: {
       type: String,
-      required: true,
       trim: true,
       maxlength: 5000,
+      default: "",
     },
     isInternalNote: {
       type: Boolean,
       default: false,
+    },
+    attachments: {
+      type: [attachmentSchema],
+      default: [],
     },
   },
   { timestamps: { createdAt: true, updatedAt: false } },

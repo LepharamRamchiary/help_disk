@@ -1,4 +1,5 @@
 import {
+  Attachment,
   USER_ROLES,
   Ticket,
   TicketPriority,
@@ -43,6 +44,7 @@ export interface SupportTicketRecord {
   status: 'Open' | 'In Progress' | 'Pending' | 'Resolved' | 'Closed';
   createdAt: string;
   updatedAt: string;
+  attachments: Attachment[];
   messages: SupportTicketMessageRecord[];
 }
 
@@ -55,6 +57,7 @@ export interface SupportTicketMessageRecord {
   body: string;
   isInternalNote: boolean;
   createdAt: string;
+  attachments: Attachment[];
 }
 
 const SUPPORT_PRIORITIES = ['Low', 'Medium', 'High', 'Urgent'] as const;
@@ -149,6 +152,89 @@ function parseAuthSession(value: unknown): AuthSession {
   };
 }
 
+function parseSupportAttachment(value: unknown): Attachment {
+  if (!isRecord(value)) {
+    throw new Error('The support service returned an invalid attachment.');
+  }
+
+  const id =
+    typeof value.id === 'string'
+      ? value.id
+      : typeof value._id === 'string'
+        ? value._id
+        : undefined;
+  const rawUrl = typeof value.url === 'string' ? value.url : undefined;
+  const dataUrl =
+    typeof value.dataUrl === 'string'
+      ? value.dataUrl
+      : rawUrl?.startsWith('data:')
+        ? rawUrl
+        : undefined;
+  const url = rawUrl?.startsWith('data:') ? undefined : rawUrl;
+  const fileName =
+    typeof value.fileName === 'string'
+      ? value.fileName
+      : url?.split('/').pop()?.split('?')[0] || 'Attachment';
+  const extension = fileName.slice(fileName.lastIndexOf('.')).toLowerCase();
+  const legacyMimeTypes: Record<string, string> = {
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.webp': 'image/webp',
+  };
+  const mimeType =
+    typeof value.mimeType === 'string'
+      ? value.mimeType
+      : legacyMimeTypes[extension] ||
+        (dataUrl?.match(/^data:([^;]+);base64,/)?.[1] ?? undefined);
+  const fileType =
+    value.fileType === 'image' ||
+    value.fileType === 'pdf' ||
+    value.fileType === 'log' ||
+    value.fileType === 'archive'
+      ? value.fileType
+      : mimeType?.startsWith('image/')
+        ? 'image'
+        : mimeType === 'application/pdf'
+          ? 'pdf'
+          : 'log';
+
+  if (
+    (!id && !url && !dataUrl) ||
+    (!dataUrl && !url) ||
+    (url !== undefined && !/^https?:\/\//i.test(url) && !url.startsWith('/')) ||
+    (dataUrl !== undefined &&
+      !/^data:(image\/(png|jpeg|gif|webp)|application\/pdf|text\/plain|application\/(json|xml)|text\/xml);base64,/.test(
+        dataUrl
+      ))
+  ) {
+    throw new Error('The support service returned an invalid attachment.');
+  }
+
+  return {
+    id: id || `legacy-${url || fileName}`,
+    fileName,
+    fileSize: typeof value.fileSize === 'string' ? value.fileSize : 'File',
+    fileType,
+    mimeType,
+    dataUrl,
+    url,
+    uploadedAt: typeof value.uploadedAt === 'string' ? value.uploadedAt : '',
+    uploadedBy: typeof value.uploadedBy === 'string' ? value.uploadedBy : 'Unknown',
+  };
+}
+
+function parseSupportAttachments(value: unknown): Attachment[] {
+  if (value === undefined) {
+    return [];
+  }
+  if (!Array.isArray(value)) {
+    throw new Error('The support service returned an invalid attachment list.');
+  }
+  return value.map(parseSupportAttachment);
+}
+
 function parseSupportTicket(value: unknown): SupportTicketRecord {
   const priority =
     isRecord(value) &&
@@ -192,6 +278,7 @@ function parseSupportTicket(value: unknown): SupportTicketRecord {
     status,
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
+    attachments: parseSupportAttachments(value.attachments),
     messages: messages.map((message) => {
       if (!isRecord(message)) {
         throw new Error('The support service returned an invalid ticket message.');
@@ -225,6 +312,7 @@ function parseSupportTicket(value: unknown): SupportTicketRecord {
         body: message.body,
         isInternalNote: message.isInternalNote,
         createdAt: message.createdAt,
+        attachments: parseSupportAttachments(message.attachments),
       };
     }),
   };
@@ -474,11 +562,12 @@ export const HelpDeskApiService = {
     reply: async (
       ticketNumber: string,
       body: string,
-      isInternalNote: boolean
+      isInternalNote: boolean,
+      attachments: Attachment[] = []
     ): Promise<SupportTicketRecord> => {
       const data = await supportRequest(`/${encodeURIComponent(ticketNumber)}/messages`, {
         method: 'POST',
-        body: JSON.stringify({ body, isInternalNote }),
+        body: JSON.stringify({ body, isInternalNote, attachments }),
       });
 
       return parseSupportTicket(data);
@@ -500,6 +589,7 @@ export const HelpDeskApiService = {
         description: string;
         category: string;
         priority: TicketPriority;
+        attachments: Attachment[];
       }
     ): Promise<{ id: string }> => {
       let response: Response;

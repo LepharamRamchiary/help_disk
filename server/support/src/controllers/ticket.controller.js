@@ -19,6 +19,113 @@ const TICKET_STATUSES = [
   "Closed",
 ];
 
+const ALLOWED_ATTACHMENT_TYPES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/webp",
+  "application/pdf",
+  "text/plain",
+  "application/json",
+  "application/xml",
+  "text/xml",
+]);
+const MAX_ATTACHMENT_SIZE = 4 * 1024 * 1024;
+const MAX_ATTACHMENT_BATCH_SIZE = 6 * 1024 * 1024;
+const MAX_TICKET_ATTACHMENT_SIZE = 8 * 1024 * 1024;
+
+const formatFileSize = (size) => {
+  const kilobytes = Math.max(1, Math.round(size / 1024));
+  return kilobytes >= 1024
+    ? `${(kilobytes / 1024).toFixed(1)} MB`
+    : `${kilobytes} KB`;
+};
+
+const parseAttachments = (value, uploadedBy) => {
+  if (value === undefined) {
+    return [];
+  }
+  if (!Array.isArray(value) || value.length > 5) {
+    throw new ApiError(400, "Provide no more than 5 attachments at a time");
+  }
+
+  let batchSize = 0;
+  return value.map((attachment) => {
+    if (!attachment || typeof attachment !== "object" || Array.isArray(attachment)) {
+      throw new ApiError(400, "An attachment is invalid");
+    }
+
+    const fileName =
+      typeof attachment.fileName === "string"
+        ? attachment.fileName.trim().replace(/[\\/]/g, "")
+        : "";
+    const mimeType =
+      typeof attachment.mimeType === "string"
+        ? attachment.mimeType.trim().toLowerCase()
+        : "";
+    const dataUrl =
+      typeof attachment.dataUrl === "string" ? attachment.dataUrl : "";
+    const dataUrlMatch =
+      /^data:([a-z0-9.+-]+\/[a-z0-9.+-]+);base64,([A-Za-z0-9+/]+={0,2})$/.exec(
+        dataUrl,
+      );
+
+    if (
+      !fileName ||
+      fileName.length > 255 ||
+      !ALLOWED_ATTACHMENT_TYPES.has(mimeType) ||
+      !dataUrlMatch ||
+      dataUrlMatch[1] !== mimeType
+    ) {
+      throw new ApiError(400, "An attachment has invalid file data or type");
+    }
+
+    const encodedData = dataUrlMatch[2];
+    const fileData = Buffer.from(encodedData, "base64");
+    if (
+      fileData.length === 0 ||
+      fileData.length > MAX_ATTACHMENT_SIZE ||
+      fileData.toString("base64") !== encodedData
+    ) {
+      throw new ApiError(400, "Attachments must be no larger than 4 MB each");
+    }
+
+    batchSize += fileData.length;
+    if (batchSize > MAX_ATTACHMENT_BATCH_SIZE) {
+      throw new ApiError(400, "Attachments must total 6 MB or less per upload");
+    }
+
+    return {
+      id: randomBytes(12).toString("hex"),
+      fileName,
+      fileSize: formatFileSize(fileData.length),
+      fileType: mimeType.startsWith("image/")
+        ? "image"
+        : mimeType === "application/pdf"
+          ? "pdf"
+          : "log",
+      mimeType,
+      dataUrl,
+      uploadedAt: new Date().toISOString(),
+      uploadedBy,
+    };
+  });
+};
+
+const getTicketAttachmentSize = (ticket) => {
+  const attachments = [
+    ...(ticket.attachments || []),
+    ...(ticket.messages || []).flatMap((message) => message.attachments || []),
+  ];
+  return attachments.reduce((size, attachment) => {
+    if (typeof attachment.dataUrl !== "string") {
+      return size;
+    }
+    const match = /;base64,([A-Za-z0-9+/]+={0,2})$/.exec(attachment.dataUrl);
+    return size + (match ? Buffer.from(match[1], "base64").length : 0);
+  }, 0);
+};
+
 // ========== Create a new ticket ==========
 const createTicket = asyncHandler(async (req, res) => {
   const { subject, description, category, priority = "MEDIUM" } = req.body ?? {};
@@ -55,6 +162,7 @@ const createTicket = asyncHandler(async (req, res) => {
   }
 
   const { id, name, email } = req.authenticatedUser;
+  const attachments = parseAttachments(req.body?.attachments, name);
   const ticket = await Ticket.create({
     ticketNumber: `HD-${Date.now()}-${randomBytes(6).toString("hex").toUpperCase()}`,
     subject: normalizedSubject,
@@ -64,6 +172,7 @@ const createTicket = asyncHandler(async (req, res) => {
     requester: id,
     requesterName: name.trim(),
     requesterEmail: email.trim().toLowerCase(),
+    attachments,
   });
 
   return res
@@ -280,7 +389,10 @@ const addTicketMessage = asyncHandler(async (req, res) => {
     typeof body !== "object" ||
     Array.isArray(body) ||
     Object.keys(body).some(
-      (field) => field !== "body" && field !== "isInternalNote",
+      (field) =>
+        field !== "body" &&
+        field !== "isInternalNote" &&
+        field !== "attachments",
     )
   ) {
     throw new ApiError(400, "Provide a valid ticket message");
@@ -294,12 +406,17 @@ const addTicketMessage = asyncHandler(async (req, res) => {
   }
 
   const messageBody = typeof body.body === "string" ? body.body.trim() : "";
-  if (!messageBody || messageBody.length > 5000) {
-    throw new ApiError(400, "Message must be between 1 and 5000 characters");
+  if (messageBody.length > 5000) {
+    throw new ApiError(400, "Message must be no more than 5000 characters");
   }
 
   const isInternalNote = body.isInternalNote === true;
   const { id, name, email, role } = req.authenticatedUser;
+  const attachments = parseAttachments(body.attachments, name);
+  if (!messageBody && attachments.length === 0) {
+    throw new ApiError(400, "A message or attachment is required");
+  }
+
   if (isInternalNote && role !== "PLATFORM_ADMIN") {
     throw new ApiError(403, "Only administrators can add internal notes");
   }
@@ -311,8 +428,24 @@ const addTicketMessage = asyncHandler(async (req, res) => {
     throw new ApiError(403, "Administrator access is required");
   }
 
+  const existingTicket = await Ticket.findOne(filter);
+  if (!existingTicket) {
+    throw new ApiError(404, "Ticket not found");
+  }
+
+  const addedAttachmentSize = attachments.reduce((size, attachment) => {
+    const match = /;base64,([A-Za-z0-9+/]+={0,2})$/.exec(attachment.dataUrl);
+    return size + (match ? Buffer.from(match[1], "base64").length : 0);
+  }, 0);
+  if (
+    getTicketAttachmentSize(existingTicket) + addedAttachmentSize >
+    MAX_TICKET_ATTACHMENT_SIZE
+  ) {
+    throw new ApiError(413, "This ticket has reached its 8 MB attachment limit");
+  }
+
   const ticket = await Ticket.findOneAndUpdate(
-    filter,
+    { _id: existingTicket._id },
     {
       $push: {
         messages: {
@@ -322,6 +455,7 @@ const addTicketMessage = asyncHandler(async (req, res) => {
           authorRole: role,
           body: messageBody,
           isInternalNote,
+          attachments,
         },
       },
     },
