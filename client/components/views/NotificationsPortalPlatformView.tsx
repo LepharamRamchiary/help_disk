@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useHelpDesk } from '@/context/HelpDeskContext';
 import { Organization, Attachment } from '@/types/helpdesk';
+import { filesToAttachments, mergeAttachments } from '@/lib/attachments';
 import {
   StatusBadge,
   PriorityBadge,
@@ -28,6 +29,7 @@ import {
   Activity,
   CreditCard,
   Users,
+  X,
   ExternalLink,
   CheckCircle2,
   Ban,
@@ -232,6 +234,20 @@ export function CustomerPortalView() {
       addToast(
         'Could not send reply',
         error instanceof Error ? error.message : 'Please try again.',
+        'error'
+      );
+    }
+  };
+
+  const handleCustomerFileChange = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    try {
+      const added = await filesToAttachments(files, currentUser.fullName);
+      setAttachments(mergeAttachments(attachments, added));
+    } catch (error) {
+      addToast(
+        'Could not attach files',
+        error instanceof Error ? error.message : 'Please choose different files.',
         'error'
       );
     }
@@ -461,15 +477,30 @@ export function CustomerPortalView() {
                         {msg.body}
                       </p>
                       {msg.attachments.length > 0 && (
-                        <div className="flex flex-wrap gap-2 pt-1">
+                        <div className="flex flex-wrap gap-3 pt-1">
                           {msg.attachments.map((att) => (
-                            <span
+                            <a
                               key={att.id}
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white border border-[#E2E8F0] rounded text-xs font-mono"
+                              href={att.dataUrl || att.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              download={att.fileType === 'image' ? undefined : att.fileName}
+                              className="inline-flex max-w-full items-center gap-2 p-2 bg-white border border-[#E2E8F0] rounded-lg text-xs font-mono"
                             >
-                              <FileText className="w-3.5 h-3.5 text-[#047857]" />
-                              {att.fileName} ({att.fileSize})
-                            </span>
+                              {att.fileType === 'image' && (att.dataUrl || att.url) ? (
+                                <img
+                                  src={att.dataUrl || att.url}
+                                  alt={att.fileName}
+                                  className="w-24 h-20 rounded-md object-cover bg-slate-50"
+                                />
+                              ) : (
+                                <FileText className="w-4 h-4 text-[#047857] shrink-0" />
+                              )}
+                              <span className="min-w-0">
+                                <span className="block truncate">{att.fileName}</span>
+                                <span className="text-[11px] text-[#64748B]">{att.fileSize}</span>
+                              </span>
+                            </a>
                           ))}
                         </div>
                       )}
@@ -487,28 +518,56 @@ export function CustomerPortalView() {
                   placeholder="Write a message or provide additional details for your support engineer..."
                   className="w-full p-3 text-xs sm:text-sm border border-[#E2E8F0] rounded-lg focus:outline-none focus:border-[#047857]"
                 />
+                {attachments.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {attachments.map((att) => (
+                      <span
+                        key={att.id}
+                        className="inline-flex items-center gap-2 px-2.5 py-1 bg-[#F8FAFC] border border-[#E2E8F0] rounded text-xs"
+                      >
+                        {att.fileType === 'image' && att.dataUrl ? (
+                          <img
+                            src={att.dataUrl}
+                            alt={att.fileName}
+                            className="w-10 h-10 rounded object-cover"
+                          />
+                        ) : (
+                          <FileText className="w-3.5 h-3.5 text-[#047857]" />
+                        )}
+                        <span className="font-mono">{att.fileName}</span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setAttachments((previous) =>
+                              previous.filter((item) => item.id !== att.id)
+                            )
+                          }
+                          aria-label={`Remove ${att.fileName}`}
+                          className="text-slate-400 hover:text-red-600"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
                 <div className="flex items-center justify-between">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAttachments((prev) => [
-                        ...prev,
-                        {
-                          id: `cust-att-${Date.now()}`,
-                          fileName: 'customer-screenshot.png',
-                          fileSize: '215 KB',
-                          fileType: 'image',
-                          uploadedAt: 'Just now',
-                          uploadedBy: custName,
-                        },
-                      ]);
-                      addToast('File Attached', 'Attached customer-screenshot.png to reply.', 'info');
-                    }}
+                  <label
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg hover:bg-slate-100"
                   >
                     <Paperclip className="w-3.5 h-3.5" />
-                    <span>Attach File ({attachments.length})</span>
-                  </button>
+                    <span>Attach Files</span>
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/png,image/jpeg,image/gif,image/webp"
+                      onChange={(event) => {
+                        void handleCustomerFileChange(event.currentTarget.files);
+                        event.currentTarget.value = '';
+                      }}
+                      className="sr-only"
+                    />
+                  </label>
 
                   <button
                     type="submit"

@@ -100,6 +100,9 @@ export interface Attachment {
   fileName: string;
   fileSize: string;
   fileType: 'image' | 'pdf' | 'log' | 'archive';
+  mimeType?: string;
+  dataUrl?: string;
+  url?: string;
   uploadedAt: string;
   uploadedBy: string;
 }

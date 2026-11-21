@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useHelpDesk } from '@/context/HelpDeskContext';
 import { TicketPriority, TicketStatus, Attachment } from '@/types/helpdesk';
+import { filesToAttachments, mergeAttachments } from '@/lib/attachments';
 import {
   StatusBadge,
   PriorityBadge,
@@ -119,18 +120,18 @@ export function TicketDetailView() {
     }
   };
 
-  const handleAttachQuickFile = () => {
-    setReplyAttachments((prev) => [
-      ...prev,
-      {
-        id: `att-${Date.now()}`,
-        fileName: `verification-output-${selectedTicket.id.toLowerCase()}.txt`,
-        fileSize: '48 KB',
-        fileType: 'log',
-        uploadedAt: 'Just now',
-        uploadedBy: currentUser.fullName,
-      },
-    ]);
+  const handleReplyFileChange = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    try {
+      const added = await filesToAttachments(files, currentUser.fullName);
+      setReplyAttachments(mergeAttachments(replyAttachments, added));
+    } catch (error) {
+      addToast(
+        'Could not attach files',
+        error instanceof Error ? error.message : 'Please choose different files.',
+        'error'
+      );
+    }
   };
 
   const handleAddTag = (e: React.FormEvent) => {
@@ -341,31 +342,39 @@ export function TicketDetailView() {
                     </p>
 
                     {/* Attachment Previews */}
-                    {msg.attachments && msg.attachments.length > 0 && (
-                      <div className="pt-2 flex flex-wrap gap-2">
-                        {msg.attachments.map((att) => (
-                          <button
-                            key={att.id}
-                            type="button"
-                            onClick={() =>
-                              addToast(
-                                `Downloaded ${att.fileName}`,
-                                `Attachment (${att.fileSize}) saved to your device.`,
-                                'info'
-                              )
-                            }
-                            className="inline-flex items-center gap-2 px-3 py-2 bg-[#F8FAFC] hover:bg-[#ECFDF5] border border-[#E2E8F0] rounded-lg text-xs transition-colors"
-                          >
-                            <FileText className="w-3.5 h-3.5 text-[#047857]" />
-                            <span className="font-mono font-medium text-[#111827]">
-                              {att.fileName}
-                            </span>
-                            <span className="font-mono text-[11px] text-[#64748B]">
-                              ({att.fileSize})
-                            </span>
-                            <Download className="w-3.5 h-3.5 text-slate-400 ml-1" />
-                          </button>
-                        ))}
+                    {msg.attachments.length > 0 && (
+                      <div className="pt-2 flex flex-wrap gap-3">
+                        {msg.attachments.map((att) => {
+                          const attachmentUrl = att.dataUrl || att.url;
+                          return (
+                            <a
+                              key={att.id}
+                              href={attachmentUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              download={att.fileType === 'image' ? undefined : att.fileName}
+                              className="inline-flex max-w-full items-center gap-2 bg-[#F8FAFC] hover:bg-[#ECFDF5] border border-[#E2E8F0] rounded-lg p-2 text-xs transition-colors"
+                            >
+                              {att.fileType === 'image' && attachmentUrl ? (
+                                <img
+                                  src={attachmentUrl}
+                                  alt={att.fileName}
+                                  className="w-24 h-20 rounded-md object-cover bg-white"
+                                />
+                              ) : (
+                                <FileText className="w-4 h-4 text-[#047857] shrink-0" />
+                              )}
+                              <span className="min-w-0">
+                                <span className="block truncate font-mono font-medium text-[#111827]">
+                                  {att.fileName}
+                                </span>
+                                <span className="text-[11px] text-[#64748B]">
+                                  {att.fileSize}
+                                </span>
+                              </span>
+                            </a>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -456,7 +465,15 @@ export function TicketDetailView() {
                       key={att.id}
                       className="inline-flex items-center gap-2 px-2.5 py-1 bg-[#F8FAFC] border border-[#E2E8F0] rounded text-xs font-mono"
                     >
-                      <FileText className="w-3.5 h-3.5 text-[#047857]" />
+                      {att.fileType === 'image' && att.dataUrl ? (
+                        <img
+                          src={att.dataUrl}
+                          alt={att.fileName}
+                          className="w-10 h-10 rounded object-cover"
+                        />
+                      ) : (
+                        <FileText className="w-3.5 h-3.5 text-[#047857]" />
+                      )}
                       {att.fileName}
                       <button
                         type="button"
@@ -473,14 +490,22 @@ export function TicketDetailView() {
               )}
 
               <div className="flex items-center justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={handleAttachQuickFile}
+                <label
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-[#047857] bg-[#F8FAFC] hover:bg-[#ECFDF5] border border-[#E2E8F0] rounded-lg transition-colors"
                 >
                   <Paperclip className="w-3.5 h-3.5" />
-                  <span>Attach File</span>
-                </button>
+                  <span>Attach Files</span>
+                  <input
+                    type="file"
+                    multiple
+                    accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.log,.txt,.har,.xml,.json"
+                    onChange={(event) => {
+                      void handleReplyFileChange(event.target.files);
+                      event.currentTarget.value = '';
+                    }}
+                    className="sr-only"
+                  />
+                </label>
 
                 <button
                   type="submit"

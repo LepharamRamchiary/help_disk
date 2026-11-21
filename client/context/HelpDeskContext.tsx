@@ -144,7 +144,7 @@ function toHelpDeskTicket(
       body: message.body,
       isInternalNote: message.isInternalNote,
       createdAt: createdAtLabel,
-      attachments: [],
+      attachments: message.attachments,
     };
   });
 
@@ -184,7 +184,7 @@ function toHelpDeskTicket(
         body: ticket.description,
         isInternalNote: false,
         createdAt: createdAtLabel,
-        attachments: [],
+        attachments: ticket.attachments,
       },
       ...persistedMessages,
     ],
@@ -579,6 +579,7 @@ export function HelpDeskProvider({ children }: { children: React.ReactNode }) {
               categories.find((category) => category.id === input.categoryId)
                 ?.name || '',
             priority: input.priority,
+            attachments: input.attachments || [],
           }
         );
         savedTicketId = created.id;
@@ -974,7 +975,8 @@ export function HelpDeskProvider({ children }: { children: React.ReactNode }) {
         const updatedRecord = await HelpDeskApiService.tickets.reply(
           ticketId,
           body.trim(),
-          currentUser.role === 'CUSTOMER' ? false : isInternalNote
+          currentUser.role === 'CUSTOMER' ? false : isInternalNote,
+          attachments
         );
         const updatedTicket = toHelpDeskTicket(
           updatedRecord,
