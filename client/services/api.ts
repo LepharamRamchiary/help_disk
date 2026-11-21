@@ -483,6 +483,17 @@ export const HelpDeskApiService = {
 
       return parseSupportTicket(data);
     },
+    updateStatus: async (
+      ticketNumber: string,
+      status: SupportTicketRecord['status']
+    ): Promise<SupportTicketRecord> => {
+      const data = await supportRequest(`/${encodeURIComponent(ticketNumber)}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status }),
+      });
+
+      return parseSupportTicket(data);
+    },
     create: async (
       input: {
         subject: string;

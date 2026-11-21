@@ -81,6 +81,14 @@ const SUPPORT_STATUS_MAP: Record<SupportTicketRecord['status'], TicketStatus> = 
   Closed: 'CLOSED',
 };
 
+const HELP_DESK_STATUS_MAP: Record<TicketStatus, SupportTicketRecord['status']> = {
+  OPEN: 'Open',
+  IN_PROGRESS: 'In Progress',
+  WAITING_FOR_CUSTOMER: 'Pending',
+  RESOLVED: 'Resolved',
+  CLOSED: 'Closed',
+};
+
 const SUPPORT_PRIORITY_MAP: Record<SupportTicketRecord['priority'], TicketPriority> = {
   Low: 'LOW',
   Medium: 'MEDIUM',
@@ -216,7 +224,7 @@ interface HelpDeskContextValue {
   createTicketModalOpen: boolean;
   setCreateTicketModalOpen: (open: boolean) => void;
   createTicket: (input: CreateTicketInput) => Promise<Ticket>;
-  updateTicketStatus: (ticketId: string, status: TicketStatus) => void;
+  updateTicketStatus: (ticketId: string, status: TicketStatus) => Promise<void>;
   updateTicketPriority: (ticketId: string, priority: TicketPriority) => void;
   assignTicketAgent: (ticketId: string, agentId: string | null) => void;
   updateTicketCategory: (ticketId: string, categoryId: string) => void;
@@ -225,7 +233,7 @@ interface HelpDeskContextValue {
   bulkUpdateTickets: (
     ticketIds: string[],
     updates: { status?: TicketStatus; priority?: TicketPriority; assignedAgentId?: string | null }
-  ) => void;
+  ) => Promise<void>;
   addTicketMessage: (
     ticketId: string,
     body: string,
@@ -687,7 +695,52 @@ export function HelpDeskProvider({ children }: { children: React.ReactNode }) {
   );
 
   const updateTicketStatus = useCallback(
-    (ticketId: string, status: TicketStatus) => {
+    async (ticketId: string, status: TicketStatus) => {
+      if (
+        !SPRING_BOOT_API_CONFIG.useMockAdapter &&
+        isAuthenticated &&
+        currentUser.role === 'PLATFORM_ADMIN'
+      ) {
+        try {
+          const updatedRecord = await HelpDeskApiService.tickets.updateStatus(
+            ticketId,
+            HELP_DESK_STATUS_MAP[status]
+          );
+          const updatedTicket = toHelpDeskTicket(
+            updatedRecord,
+            currentUser,
+            categories,
+            customers
+          );
+          setTickets((previous) =>
+            previous.map((ticket) => {
+              if (ticket.id !== ticketId) return ticket;
+              return {
+                ...updatedTicket,
+                activities: [
+                  ...ticket.activities,
+                  {
+                    id: `act-${Date.now()}`,
+                    ticketId,
+                    actorName: currentUser.fullName,
+                    action: `Updated status from ${ticket.status.replace(/_/g, ' ')} to ${status.replace(/_/g, ' ')}`,
+                    timestamp: 'Just now',
+                  },
+                ],
+              };
+            })
+          );
+          addToast('Status Updated', `Ticket ${ticketId} marked as ${status.replace(/_/g, ' ')}.`);
+        } catch (error) {
+          addToast(
+            'Could not update ticket status',
+            error instanceof Error ? error.message : 'Please try again.',
+            'error'
+          );
+        }
+        return;
+      }
+
       setTickets((prev) =>
         prev.map((t) => {
           if (t.id !== ticketId) return t;
@@ -713,7 +766,7 @@ export function HelpDeskProvider({ children }: { children: React.ReactNode }) {
       );
       addToast('Status Updated', `Ticket ${ticketId} marked as ${status.replace(/_/g, ' ')}.`);
     },
-    [currentUser.fullName, addToast]
+    [currentUser, isAuthenticated, categories, customers, addToast]
   );
 
   const updateTicketPriority = useCallback(
@@ -821,10 +874,36 @@ export function HelpDeskProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const bulkUpdateTickets = useCallback(
-    (
+    async (
       ticketIds: string[],
       updates: { status?: TicketStatus; priority?: TicketPriority; assignedAgentId?: string | null }
     ) => {
+      const isLiveAdmin =
+        !SPRING_BOOT_API_CONFIG.useMockAdapter &&
+        isAuthenticated &&
+        currentUser.role === 'PLATFORM_ADMIN';
+      const targetStatus = updates.status;
+      const updatedRecords = new Map<string, SupportTicketRecord>();
+      let failedStatusUpdates = 0;
+      if (isLiveAdmin && targetStatus) {
+        const results = await Promise.allSettled(
+          ticketIds.map(async (ticketId) => ({
+            ticketId,
+            record: await HelpDeskApiService.tickets.updateStatus(
+              ticketId,
+              HELP_DESK_STATUS_MAP[targetStatus]
+            ),
+          }))
+        );
+        results.forEach((result) => {
+          if (result.status === 'fulfilled') {
+            updatedRecords.set(result.value.ticketId, result.value.record);
+          } else {
+            failedStatusUpdates += 1;
+          }
+        });
+      }
+
       const agent =
         updates.assignedAgentId !== undefined && updates.assignedAgentId !== null
           ? teamMembers.find((m) => m.id === updates.assignedAgentId) || null
@@ -833,27 +912,50 @@ export function HelpDeskProvider({ children }: { children: React.ReactNode }) {
       setTickets((prev) =>
         prev.map((t) => {
           if (!ticketIds.includes(t.id)) return t;
+          const persistedRecord = updatedRecords.get(t.id);
+          const baseTicket = persistedRecord
+            ? toHelpDeskTicket(persistedRecord, currentUser, categories, customers)
+            : t;
           return {
-            ...t,
-            status: updates.status ?? t.status,
-            priority: updates.priority ?? t.priority,
+            ...baseTicket,
+            status: targetStatus && !isLiveAdmin ? targetStatus : baseTicket.status,
+            priority: updates.priority ?? baseTicket.priority,
             assignedAgentId:
-              updates.assignedAgentId !== undefined ? (agent ? agent.id : null) : t.assignedAgentId,
+              updates.assignedAgentId !== undefined
+                ? (agent ? agent.id : null)
+                : baseTicket.assignedAgentId,
             assignedAgentName:
-              updates.assignedAgentId !== undefined ? (agent ? agent.fullName : null) : t.assignedAgentName,
+              updates.assignedAgentId !== undefined
+                ? (agent ? agent.fullName : null)
+                : baseTicket.assignedAgentName,
             assignedAgentInitials:
               updates.assignedAgentId !== undefined
                 ? agent
                   ? agent.avatarInitials
                   : null
-                : t.assignedAgentInitials,
-            updatedAt: 'Just now',
+                : baseTicket.assignedAgentInitials,
+            updatedAt: persistedRecord ? baseTicket.updatedAt : 'Just now',
           };
         })
       );
-      addToast('Bulk Update Complete', `Updated ${ticketIds.length} selected ticket(s).`);
+      if (failedStatusUpdates > 0) {
+        addToast(
+          'Bulk Update Partially Complete',
+          `Could not save status for ${failedStatusUpdates} ticket(s).`,
+          'error'
+        );
+      } else {
+        addToast('Bulk Update Complete', `Updated ${ticketIds.length} selected ticket(s).`);
+      }
     },
-    [teamMembers, addToast]
+    [
+      teamMembers,
+      currentUser,
+      isAuthenticated,
+      categories,
+      customers,
+      addToast,
+    ]
   );
 
   const addTicketMessage = useCallback(
