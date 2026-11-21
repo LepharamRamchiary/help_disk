@@ -11,6 +11,48 @@ const attachmentSchema = new mongoose.Schema(
   { _id: false },
 );
 
+const messageSchema = new mongoose.Schema(
+  {
+    authorId: {
+      type: String,
+      required: true,
+    },
+    authorName: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    authorEmail: {
+      type: String,
+      required: true,
+      lowercase: true,
+      trim: true,
+    },
+    authorRole: {
+      type: String,
+      enum: [
+        "PLATFORM_ADMIN",
+        "COMPANY_ADMIN",
+        "SUPPORT_MANAGER",
+        "SUPPORT_AGENT",
+        "CUSTOMER",
+      ],
+      required: true,
+    },
+    body: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 5000,
+    },
+    isInternalNote: {
+      type: Boolean,
+      default: false,
+    },
+  },
+  { timestamps: { createdAt: true, updatedAt: false } },
+);
+
 const ticketSchema = new mongoose.Schema(
   {
     ticketNumber: {
@@ -64,6 +106,11 @@ const ticketSchema = new mongoose.Schema(
 
     attachments: {
       type: [attachmentSchema],
+      default: [],
+    },
+
+    messages: {
+      type: [messageSchema],
       default: [],
     },
 

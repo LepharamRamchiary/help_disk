@@ -84,9 +84,16 @@ const getMyTickets = asyncHandler(async (req, res) => {
   const tickets = await Ticket.find({
     requester: req.authenticatedUser.id,
   }).sort({ createdAt: -1 });
+  const customerTickets = tickets.map((ticket) => {
+    const customerTicket = ticket.toObject();
+    customerTicket.messages = (customerTicket.messages || []).filter(
+      (message) => !message.isInternalNote,
+    );
+    return customerTicket;
+  });
   return res
     .status(200)
-    .json(new ApiResponse(200, tickets, "Your tickets retrieved successfully"));
+    .json(new ApiResponse(200, customerTickets, "Your tickets retrieved successfully"));
 });
 
 // ========== Get today's tickets ==========
@@ -265,6 +272,82 @@ const updateTicketStatus = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, ticket, "Ticket status updated successfully"));
 });
 
+// ================ Add ticket message ================
+const addTicketMessage = asyncHandler(async (req, res) => {
+  const body = req.body;
+  if (
+    !body ||
+    typeof body !== "object" ||
+    Array.isArray(body) ||
+    Object.keys(body).some(
+      (field) => field !== "body" && field !== "isInternalNote",
+    )
+  ) {
+    throw new ApiError(400, "Provide a valid ticket message");
+  }
+
+  if (
+    Object.hasOwn(body, "isInternalNote") &&
+    typeof body.isInternalNote !== "boolean"
+  ) {
+    throw new ApiError(400, "isInternalNote must be a boolean");
+  }
+
+  const messageBody = typeof body.body === "string" ? body.body.trim() : "";
+  if (!messageBody || messageBody.length > 5000) {
+    throw new ApiError(400, "Message must be between 1 and 5000 characters");
+  }
+
+  const isInternalNote = body.isInternalNote === true;
+  const { id, name, email, role } = req.authenticatedUser;
+  if (isInternalNote && role !== "PLATFORM_ADMIN") {
+    throw new ApiError(403, "Only administrators can add internal notes");
+  }
+
+  const filter = { ticketNumber: req.params.ticketNumber };
+  if (role === "CUSTOMER") {
+    filter.requester = id;
+  } else if (role !== "PLATFORM_ADMIN") {
+    throw new ApiError(403, "Administrator access is required");
+  }
+
+  const ticket = await Ticket.findOneAndUpdate(
+    filter,
+    {
+      $push: {
+        messages: {
+          authorId: id,
+          authorName: name,
+          authorEmail: email,
+          authorRole: role,
+          body: messageBody,
+          isInternalNote,
+        },
+      },
+      ...(role === "PLATFORM_ADMIN" &&
+      !isInternalNote
+        ? { $set: { status: "In Progress" } }
+        : {}),
+    },
+    { new: true, runValidators: true },
+  );
+
+  if (!ticket) {
+    throw new ApiError(404, "Ticket not found");
+  }
+
+  const responseTicket = ticket.toObject();
+  if (role === "CUSTOMER") {
+    responseTicket.messages = (responseTicket.messages || []).filter(
+      (message) => !message.isInternalNote,
+    );
+  }
+
+  return res
+    .status(201)
+    .json(new ApiResponse(201, responseTicket, "Ticket message added successfully"));
+});
+
 // ================ Delete a ticket ==========
 const deleteTicket = asyncHandler(async (req, res) => {
   const ticketNumber = req.params.ticketNumber;
@@ -294,5 +377,6 @@ export {
   getTicketSummary,
   getTodayTickets,
   getTodaysTickets,
+  addTicketMessage,
   updateTicketStatus,
 };

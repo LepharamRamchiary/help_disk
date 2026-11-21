@@ -43,6 +43,18 @@ export interface SupportTicketRecord {
   status: 'Open' | 'In Progress' | 'Pending' | 'Resolved' | 'Closed';
   createdAt: string;
   updatedAt: string;
+  messages: SupportTicketMessageRecord[];
+}
+
+export interface SupportTicketMessageRecord {
+  id: string;
+  authorId: string;
+  authorName: string;
+  authorEmail: string;
+  authorRole: UserRole;
+  body: string;
+  isInternalNote: boolean;
+  createdAt: string;
 }
 
 const SUPPORT_PRIORITIES = ['Low', 'Medium', 'High', 'Urgent'] as const;
@@ -163,6 +175,11 @@ function parseSupportTicket(value: unknown): SupportTicketRecord {
     throw new Error('The support service returned an invalid ticket.');
   }
 
+  if (value.messages !== undefined && !Array.isArray(value.messages)) {
+    throw new Error('The support service returned an invalid ticket message list.');
+  }
+  const messages = Array.isArray(value.messages) ? value.messages : [];
+
   return {
     ticketNumber: value.ticketNumber,
     subject: value.subject,
@@ -175,7 +192,78 @@ function parseSupportTicket(value: unknown): SupportTicketRecord {
     status,
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
+    messages: messages.map((message) => {
+      if (!isRecord(message)) {
+        throw new Error('The support service returned an invalid ticket message.');
+      }
+
+      const id =
+        typeof message.id === 'string'
+          ? message.id
+          : typeof message._id === 'string'
+            ? message._id
+            : undefined;
+      if (
+        !id ||
+        typeof message.authorId !== 'string' ||
+        typeof message.authorName !== 'string' ||
+        typeof message.authorEmail !== 'string' ||
+        !isUserRole(message.authorRole) ||
+        typeof message.body !== 'string' ||
+        typeof message.isInternalNote !== 'boolean' ||
+        typeof message.createdAt !== 'string'
+      ) {
+        throw new Error('The support service returned an invalid ticket message.');
+      }
+
+      return {
+        id,
+        authorId: message.authorId,
+        authorName: message.authorName,
+        authorEmail: message.authorEmail,
+        authorRole: message.authorRole,
+        body: message.body,
+        isInternalNote: message.isInternalNote,
+        createdAt: message.createdAt,
+      };
+    }),
   };
+}
+
+async function supportRequest(path: string, options: RequestInit = {}): Promise<unknown> {
+  let response: Response;
+  try {
+    response = await fetch(
+      `${SPRING_BOOT_API_CONFIG.baseUrl.replace(/\/$/, '')}/support/tickets${path}`,
+      {
+        ...options,
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(options.headers || {}),
+        },
+      }
+    );
+  } catch {
+    throw new Error('Unable to reach the support service. Please try again.');
+  }
+
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    throw new Error('The support service returned an invalid response.');
+  }
+
+  if (!isRecord(body) || !response.ok || body.success !== true) {
+    throw new Error(
+      isRecord(body) && typeof body.message === 'string'
+        ? body.message
+        : 'The support service request failed.'
+    );
+  }
+
+  return body.data;
 }
 
 export const AuthApiService = {
@@ -368,32 +456,32 @@ export const HelpDeskApiService = {
   },
   tickets: {
     my: async (): Promise<SupportTicketRecord[]> => {
-      let response: Response;
-      try {
-        response = await fetch(
-          `${SPRING_BOOT_API_CONFIG.baseUrl.replace(/\/$/, '')}/support/tickets/my`,
-          { credentials: 'include' }
-        );
-      } catch {
-        throw new Error('Unable to reach the support service. Please try again.');
+      const data = await supportRequest('/my');
+      if (!Array.isArray(data)) {
+        throw new Error('The support service returned an invalid ticket list.');
       }
 
-      let body: unknown;
-      try {
-        body = await response.json();
-      } catch {
-        throw new Error('The support service returned an invalid response.');
+      return data.map(parseSupportTicket);
+    },
+    all: async (): Promise<SupportTicketRecord[]> => {
+      const data = await supportRequest('');
+      if (!Array.isArray(data)) {
+        throw new Error('The support service returned an invalid ticket list.');
       }
 
-      if (!isRecord(body) || !response.ok || body.success !== true || !Array.isArray(body.data)) {
-        throw new Error(
-          isRecord(body) && typeof body.message === 'string'
-            ? body.message
-            : 'Could not load your support tickets.'
-        );
-      }
+      return data.map(parseSupportTicket);
+    },
+    reply: async (
+      ticketNumber: string,
+      body: string,
+      isInternalNote: boolean
+    ): Promise<SupportTicketRecord> => {
+      const data = await supportRequest(`/${encodeURIComponent(ticketNumber)}/messages`, {
+        method: 'POST',
+        body: JSON.stringify({ body, isInternalNote }),
+      });
 
-      return body.data.map(parseSupportTicket);
+      return parseSupportTicket(data);
     },
     create: async (
       input: {

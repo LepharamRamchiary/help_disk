@@ -7,6 +7,7 @@ import {
   getMyTickets,
   getTicketSummary,
   getTodayTickets,
+  addTicketMessage,
   updateTicketStatus,
 } from "../controllers/ticket.controller.js";
 import {
@@ -23,6 +24,9 @@ router.route("/my").get(authenticate, requireCustomer, getMyTickets);
 router.route("/summary").get(authenticate, requirePlatformAdmin, getTicketSummary);
 router.route("/today").get(authenticate, requirePlatformAdmin, getTodayTickets);
 router.route("/now").get(authenticate, requirePlatformAdmin, getTodayTickets);
+router
+  .route("/:ticketNumber/messages")
+  .post(authenticate, addTicketMessage);
 router
   .route("/:ticketNumber/status")
   .patch(authenticate, requirePlatformAdmin, updateTicketStatus);

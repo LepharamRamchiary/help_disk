@@ -98,17 +98,25 @@ export function TicketDetailView() {
     );
   };
 
-  const handleSendReply = (e: React.FormEvent) => {
+  const handleSendReply = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!replyBody.trim() && replyAttachments.length === 0) return;
-    addTicketMessage(
-      selectedTicket.id,
-      replyBody,
-      isCustomer ? false : isInternalNote,
-      replyAttachments
-    );
-    setReplyBody('');
-    setReplyAttachments([]);
+    try {
+      await addTicketMessage(
+        selectedTicket.id,
+        replyBody,
+        isCustomer ? false : isInternalNote,
+        replyAttachments
+      );
+      setReplyBody('');
+      setReplyAttachments([]);
+    } catch (error) {
+      addToast(
+        'Could not send reply',
+        error instanceof Error ? error.message : 'Please try again.',
+        'error'
+      );
+    }
   };
 
   const handleAttachQuickFile = () => {
