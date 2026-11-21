@@ -324,10 +324,6 @@ const addTicketMessage = asyncHandler(async (req, res) => {
           isInternalNote,
         },
       },
-      ...(role === "PLATFORM_ADMIN" &&
-      !isInternalNote
-        ? { $set: { status: "In Progress" } }
-        : {}),
     },
     { new: true, runValidators: true },
   );
