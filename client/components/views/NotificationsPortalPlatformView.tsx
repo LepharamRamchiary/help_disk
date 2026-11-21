@@ -221,12 +221,20 @@ export function CustomerPortalView() {
     [activeTicket]
   );
 
-  const handleCustomerReply = (e: React.FormEvent) => {
+  const handleCustomerReply = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeTicket || (!replyText.trim() && attachments.length === 0)) return;
-    addTicketMessage(activeTicket.id, replyText, false, attachments);
-    setReplyText('');
-    setAttachments([]);
+    try {
+      await addTicketMessage(activeTicket.id, replyText, false, attachments);
+      setReplyText('');
+      setAttachments([]);
+    } catch (error) {
+      addToast(
+        'Could not send reply',
+        error instanceof Error ? error.message : 'Please try again.',
+        'error'
+      );
+    }
   };
 
   return (
@@ -525,6 +533,7 @@ export function CustomerPortalView() {
 export function PlatformAdminView() {
   const {
     organizations,
+    tickets,
     toggleOrganizationStatus,
     updateOrganizationPlan,
     switchOrganization,
@@ -599,6 +608,79 @@ export function PlatformAdminView() {
             EU-North & US-East clusters nominal
           </div>
         </div>
+      </div>
+
+      {/* Platform-Wide Support Queue */}
+      <div className="bg-white border border-[#E2E8F0] rounded-xl overflow-hidden">
+        <div className="px-6 py-4 border-b border-[#E2E8F0] flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-base font-bold text-[#111827]">Support Ticket Queue</h2>
+            <p className="text-xs text-[#64748B]">
+              Review incoming customer issues and open a ticket to view its full history or reply.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigateTo('tickets')}
+            className="px-3 py-2 text-xs font-semibold text-[#047857] bg-[#ECFDF5] hover:bg-[#D1FAE5] rounded-lg"
+          >
+            View all {tickets.length} tickets
+          </button>
+        </div>
+
+        {tickets.length === 0 ? (
+          <div className="p-6 text-center text-xs text-[#64748B]">
+            No support tickets are available.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-[#E2E8F0] bg-[#F8FAFC] text-[11px] font-semibold uppercase tracking-wider text-[#64748B]">
+                  <th className="py-3 px-4">Ticket</th>
+                  <th className="py-3 px-4">Requester</th>
+                  <th className="py-3 px-4">Category</th>
+                  <th className="py-3 px-4">Priority</th>
+                  <th className="py-3 px-4">Status</th>
+                  <th className="py-3 px-4 text-right">Updated</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#E2E8F0] text-xs">
+                {tickets.slice(0, 5).map((ticket) => (
+                  <tr
+                    key={ticket.id}
+                    className="hover:bg-[#F0FDF4]/50 transition-colors"
+                  >
+                    <td className="py-3 px-4">
+                      <div className="font-mono font-bold text-[#047857]">{ticket.id}</div>
+                      <button
+                        type="button"
+                        onClick={() => navigateTo('ticket-detail', { ticketId: ticket.id })}
+                        className="text-left font-semibold text-[#111827] hover:text-[#047857] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#047857]"
+                      >
+                        {ticket.subject}
+                      </button>
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="font-medium text-[#111827]">{ticket.customerName}</div>
+                      <div className="text-[11px] text-[#64748B]">{ticket.customerEmail}</div>
+                    </td>
+                    <td className="py-3 px-4 text-[#64748B]">{ticket.categoryName}</td>
+                    <td className="py-3 px-4">
+                      <PriorityBadge priority={ticket.priority} />
+                    </td>
+                    <td className="py-3 px-4">
+                      <StatusBadge status={ticket.status} />
+                    </td>
+                    <td className="py-3 px-4 text-right font-mono text-[#64748B]">
+                      {ticket.updatedAt}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Organization Directory Table */}

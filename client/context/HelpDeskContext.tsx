@@ -114,6 +114,31 @@ function toHelpDeskTicket(
   const updatedAtLabel = Number.isNaN(updatedAt.getTime())
     ? ticket.updatedAt
     : updatedAt.toLocaleString();
+  const persistedMessages = ticket.messages.map((message) => {
+    const createdAt = new Date(message.createdAt);
+    const createdAtLabel = Number.isNaN(createdAt.getTime())
+      ? message.createdAt
+      : createdAt.toLocaleString();
+    const authorInitials = message.authorName
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0].toUpperCase())
+      .join('');
+
+    return {
+      id: message.id,
+      ticketId: ticket.ticketNumber,
+      authorId: message.authorId,
+      authorName: message.authorName,
+      authorRole: message.authorRole,
+      authorInitials,
+      body: message.body,
+      isInternalNote: message.isInternalNote,
+      createdAt: createdAtLabel,
+      attachments: [],
+    };
+  });
 
   return {
     id: ticket.ticketNumber,
@@ -127,7 +152,7 @@ function toHelpDeskTicket(
     customerId: ticket.requester,
     customerName: ticket.requesterName,
     customerEmail: ticket.requesterEmail,
-    customerOrganization: customer?.organization || user.organizationName,
+    customerOrganization: customer?.organization || 'Organization not provided',
     customerInitials: customer?.avatarInitials || initials,
     assignedAgentId: null,
     assignedAgentName: null,
@@ -153,6 +178,7 @@ function toHelpDeskTicket(
         createdAt: createdAtLabel,
         attachments: [],
       },
+      ...persistedMessages,
     ],
     activities: [],
   };
@@ -205,7 +231,7 @@ interface HelpDeskContextValue {
     body: string,
     isInternalNote: boolean,
     attachments?: Attachment[]
-  ) => void;
+  ) => Promise<void>;
 
   // Customers
   customers: Customer[];
@@ -393,6 +419,42 @@ export function HelpDeskProvider({ children }: { children: React.ReactNode }) {
         if (!active) return;
         addToast(
           'Could not load saved tickets',
+          error instanceof Error ? error.message : 'Please refresh and try again.',
+          'error'
+        );
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [addToast, categories, currentUser, customers, isAuthenticated]);
+
+  useEffect(() => {
+    if (
+      SPRING_BOOT_API_CONFIG.useMockAdapter ||
+      !isAuthenticated ||
+      currentUser.role !== 'PLATFORM_ADMIN'
+    ) {
+      return;
+    }
+
+    let active = true;
+    setTickets([]);
+    HelpDeskApiService.tickets
+      .all()
+      .then((records) => {
+        if (!active) return;
+
+        setTickets(
+          records.map((record) =>
+            toHelpDeskTicket(record, currentUser, categories, customers)
+          )
+        );
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        addToast(
+          'Could not load all support tickets',
           error instanceof Error ? error.message : 'Please refresh and try again.',
           'error'
         );
@@ -795,8 +857,41 @@ export function HelpDeskProvider({ children }: { children: React.ReactNode }) {
   );
 
   const addTicketMessage = useCallback(
-    (ticketId: string, body: string, isInternalNote: boolean, attachments: Attachment[] = []) => {
+    async (
+      ticketId: string,
+      body: string,
+      isInternalNote: boolean,
+      attachments: Attachment[] = []
+    ) => {
       if (!body.trim() && attachments.length === 0) return;
+      if (
+        !SPRING_BOOT_API_CONFIG.useMockAdapter &&
+        isAuthenticated &&
+        (currentUser.role === 'PLATFORM_ADMIN' || currentUser.role === 'CUSTOMER')
+      ) {
+        const updatedRecord = await HelpDeskApiService.tickets.reply(
+          ticketId,
+          body.trim(),
+          currentUser.role === 'CUSTOMER' ? false : isInternalNote
+        );
+        const updatedTicket = toHelpDeskTicket(
+          updatedRecord,
+          currentUser,
+          categories,
+          customers
+        );
+        setTickets((previous) =>
+          previous.map((ticket) => (ticket.id === ticketId ? updatedTicket : ticket))
+        );
+        addToast(
+          isInternalNote ? 'Internal Note Saved' : 'Reply Sent',
+          isInternalNote
+            ? `Visible only to support staff on ${ticketId}.`
+            : `Your response on ${ticketId} has been delivered.`
+        );
+        return;
+      }
+
       const newMessage = {
         id: `msg-${Date.now()}`,
         ticketId,
@@ -843,7 +938,7 @@ export function HelpDeskProvider({ children }: { children: React.ReactNode }) {
           : `Your response on ${ticketId} has been delivered.`
       );
     },
-    [currentUser, addToast]
+    [currentUser, isAuthenticated, categories, customers, addToast]
   );
 
   const addCustomer = useCallback(
