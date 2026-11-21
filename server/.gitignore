@@ -11,5 +11,6 @@ auth/.env.local
 
 # support
 support/node_modules
+support/uploads/
 support/.env
 support/.env.local

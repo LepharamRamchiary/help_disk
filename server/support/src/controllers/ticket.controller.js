@@ -1,4 +1,8 @@
 import { randomBytes } from "node:crypto";
+import {
+  saveLegacyAttachments,
+  UPLOAD_DIRECTORY,
+} from "../middlewares/upload.middleware.js";
 import { Ticket } from "../models/ticket.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
@@ -33,6 +37,8 @@ const ALLOWED_ATTACHMENT_TYPES = new Set([
 const MAX_ATTACHMENT_SIZE = 4 * 1024 * 1024;
 const MAX_ATTACHMENT_BATCH_SIZE = 6 * 1024 * 1024;
 const MAX_TICKET_ATTACHMENT_SIZE = 8 * 1024 * 1024;
+const STORAGE_KEY_REGEX =
+  /^[a-f0-9]{32}\.(png|jpg|gif|webp|pdf|txt|json|xml)$/;
 
 const formatFileSize = (size) => {
   const kilobytes = Math.max(1, Math.round(size / 1024));
@@ -112,12 +118,52 @@ const parseAttachments = (value, uploadedBy) => {
   });
 };
 
+const attachmentsFromFiles = (files, uploadedBy) => {
+  let batchSize = 0;
+  return files.map((file) => {
+    const fileName =
+      typeof file.originalname === "string"
+        ? file.originalname.trim().replace(/[\\/]/g, "")
+        : "";
+    if (!fileName || fileName.length > 255) {
+      throw new ApiError(400, "An attachment has an invalid file name");
+    }
+
+    batchSize += file.size;
+    if (batchSize > MAX_ATTACHMENT_BATCH_SIZE) {
+      throw new ApiError(413, "Attachments must total 6 MB or less per upload");
+    }
+    if (file.size === 0 || file.size > MAX_ATTACHMENT_SIZE) {
+      throw new ApiError(413, "Each attachment must be 4 MB or smaller");
+    }
+
+    return {
+      id: randomBytes(12).toString("hex"),
+      fileName,
+      fileSize: formatFileSize(file.size),
+      fileType: file.mimetype.startsWith("image/")
+        ? "image"
+        : file.mimetype === "application/pdf"
+          ? "pdf"
+          : "log",
+      mimeType: file.mimetype,
+      storageKey: file.filename,
+      sizeBytes: file.size,
+      uploadedAt: new Date().toISOString(),
+      uploadedBy,
+    };
+  });
+};
+
 const getTicketAttachmentSize = (ticket) => {
   const attachments = [
     ...(ticket.attachments || []),
     ...(ticket.messages || []).flatMap((message) => message.attachments || []),
   ];
   return attachments.reduce((size, attachment) => {
+    if (Number.isSafeInteger(attachment.sizeBytes)) {
+      return size + attachment.sizeBytes;
+    }
     if (typeof attachment.dataUrl !== "string") {
       return size;
     }
@@ -162,7 +208,31 @@ const createTicket = asyncHandler(async (req, res) => {
   }
 
   const { id, name, email } = req.authenticatedUser;
-  const attachments = parseAttachments(req.body?.attachments, name);
+  const attachments = [
+    ...parseAttachments(req.body?.attachments, name),
+    ...attachmentsFromFiles(req.files || [], name),
+  ];
+  const totalAttachmentSize = attachments.reduce(
+    (size, attachment) => {
+      if (Number.isSafeInteger(attachment.sizeBytes)) {
+        return size + attachment.sizeBytes;
+      }
+      if (typeof attachment.dataUrl !== "string") {
+        return size;
+      }
+      const match = /;base64,([A-Za-z0-9+/]+={0,2})$/.exec(
+        attachment.dataUrl,
+      );
+      return size + (match ? Buffer.from(match[1], "base64").length : 0);
+    },
+    0,
+  );
+  if (
+    attachments.length > 5 ||
+    totalAttachmentSize > MAX_ATTACHMENT_BATCH_SIZE
+  ) {
+    throw new ApiError(413, "Attachments must total 6 MB or less per upload");
+  }
   const ticket = await Ticket.create({
     ticketNumber: `HD-${Date.now()}-${randomBytes(6).toString("hex").toUpperCase()}`,
     subject: normalizedSubject,
@@ -183,6 +253,7 @@ const createTicket = asyncHandler(async (req, res) => {
 // ========== Get all tickets ==========
 const getAllTickets = asyncHandler(async (req, res) => {
   const tickets = await Ticket.find().sort({ createdAt: -1 });
+  await Promise.all(tickets.map((ticket) => saveLegacyAttachments(ticket)));
   return res
     .status(200)
     .json(new ApiResponse(200, tickets, "Tickets retrieved successfully"));
@@ -193,6 +264,7 @@ const getMyTickets = asyncHandler(async (req, res) => {
   const tickets = await Ticket.find({
     requester: req.authenticatedUser.id,
   }).sort({ createdAt: -1 });
+  await Promise.all(tickets.map((ticket) => saveLegacyAttachments(ticket)));
   const customerTickets = tickets.map((ticket) => {
     const customerTicket = ticket.toObject();
     customerTicket.messages = (customerTicket.messages || []).filter(
@@ -219,6 +291,7 @@ const getTodayTickets = asyncHandler(async (req, res) => {
       $lte: endOfDay,
     },
   }).sort({ createdAt: -1 });
+  await Promise.all(tickets.map((ticket) => saveLegacyAttachments(ticket)));
 
   return res
     .status(200)
@@ -381,6 +454,68 @@ const updateTicketStatus = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, ticket, "Ticket status updated successfully"));
 });
 
+const authorizeTicketMessage = asyncHandler(async (req, res, next) => {
+  const { id, role } = req.authenticatedUser;
+  const filter = { ticketNumber: req.params.ticketNumber };
+  if (role === "CUSTOMER") {
+    filter.requester = id;
+  } else if (role !== "PLATFORM_ADMIN") {
+    throw new ApiError(403, "Administrator access is required");
+  }
+
+  const ticket = await Ticket.findOne(filter).select("_id");
+  if (!ticket) {
+    throw new ApiError(404, "Ticket not found");
+  }
+
+  req.authorizedTicketId = ticket._id;
+  return next();
+});
+
+const getTicketAttachment = asyncHandler(async (req, res) => {
+  const { id, role } = req.authenticatedUser;
+  const filter = { ticketNumber: req.params.ticketNumber };
+  if (role === "CUSTOMER") {
+    filter.requester = id;
+  } else if (role !== "PLATFORM_ADMIN") {
+    throw new ApiError(403, "Administrator access is required");
+  }
+
+  const ticket = await Ticket.findOne(filter);
+  if (!ticket) {
+    throw new ApiError(404, "Attachment not found");
+  }
+
+  const visibleMessages =
+    role === "CUSTOMER"
+      ? ticket.messages.filter((message) => !message.isInternalNote)
+      : ticket.messages;
+  const attachments = [
+    ...(ticket.attachments || []),
+    ...visibleMessages.flatMap((message) => message.attachments || []),
+  ];
+  const attachment = attachments.find(
+    (item) => item.id === req.params.attachmentId,
+  );
+  if (
+    !attachment ||
+    typeof attachment.fileName !== "string" ||
+    typeof attachment.storageKey !== "string" ||
+    !STORAGE_KEY_REGEX.test(attachment.storageKey) ||
+    !ALLOWED_ATTACHMENT_TYPES.has(attachment.mimeType)
+  ) {
+    throw new ApiError(404, "Attachment not found");
+  }
+
+  const fileName = attachment.fileName.replace(/[^\x20-\x7e"\\]/g, "_");
+  return res
+    .set("Content-Type", attachment.mimeType)
+    .set("Content-Disposition", `inline; filename="${fileName}"`)
+    .set("X-Content-Type-Options", "nosniff")
+    .set("Cache-Control", "private, no-store")
+    .sendFile(attachment.storageKey, { root: UPLOAD_DIRECTORY });
+});
+
 // ================ Add ticket message ================
 const addTicketMessage = asyncHandler(async (req, res) => {
   const body = req.body;
@@ -398,9 +533,12 @@ const addTicketMessage = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Provide a valid ticket message");
   }
 
+  const internalNoteValue = body.isInternalNote;
   if (
-    Object.hasOwn(body, "isInternalNote") &&
-    typeof body.isInternalNote !== "boolean"
+    internalNoteValue !== undefined &&
+    typeof internalNoteValue !== "boolean" &&
+    internalNoteValue !== "true" &&
+    internalNoteValue !== "false"
   ) {
     throw new ApiError(400, "isInternalNote must be a boolean");
   }
@@ -410,9 +548,13 @@ const addTicketMessage = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Message must be no more than 5000 characters");
   }
 
-  const isInternalNote = body.isInternalNote === true;
+  const isInternalNote =
+    internalNoteValue === true || internalNoteValue === "true";
   const { id, name, email, role } = req.authenticatedUser;
-  const attachments = parseAttachments(body.attachments, name);
+  const attachments = [
+    ...parseAttachments(body.attachments, name),
+    ...attachmentsFromFiles(req.files || [], name),
+  ];
   if (!messageBody && attachments.length === 0) {
     throw new ApiError(400, "A message or attachment is required");
   }
@@ -421,19 +563,19 @@ const addTicketMessage = asyncHandler(async (req, res) => {
     throw new ApiError(403, "Only administrators can add internal notes");
   }
 
-  const filter = { ticketNumber: req.params.ticketNumber };
-  if (role === "CUSTOMER") {
-    filter.requester = id;
-  } else if (role !== "PLATFORM_ADMIN") {
-    throw new ApiError(403, "Administrator access is required");
-  }
-
-  const existingTicket = await Ticket.findOne(filter);
+  const existingTicket = await Ticket.findById(req.authorizedTicketId);
   if (!existingTicket) {
     throw new ApiError(404, "Ticket not found");
   }
+  await saveLegacyAttachments(existingTicket);
 
   const addedAttachmentSize = attachments.reduce((size, attachment) => {
+    if (Number.isSafeInteger(attachment.sizeBytes)) {
+      return size + attachment.sizeBytes;
+    }
+    if (typeof attachment.dataUrl !== "string") {
+      return size;
+    }
     const match = /;base64,([A-Za-z0-9+/]+={0,2})$/.exec(attachment.dataUrl);
     return size + (match ? Buffer.from(match[1], "base64").length : 0);
   }, 0);
@@ -508,5 +650,7 @@ export {
   getTodayTickets,
   getTodaysTickets,
   addTicketMessage,
+  authorizeTicketMessage,
+  getTicketAttachment,
   updateTicketStatus,
 };

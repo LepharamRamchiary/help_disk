@@ -4,38 +4,38 @@ const attachmentSchema = new mongoose.Schema(
   {
     id: {
       type: String,
-      required: true,
     },
     fileName: {
       type: String,
-      required: true,
       trim: true,
       maxlength: 255,
     },
     fileSize: {
       type: String,
-      required: true,
     },
     fileType: {
       type: String,
       enum: ["image", "pdf", "log", "archive"],
-      required: true,
     },
     mimeType: {
       type: String,
-      required: true,
     },
     dataUrl: {
       type: String,
-      required: true,
+    },
+    storageKey: {
+      type: String,
+      trim: true,
+    },
+    sizeBytes: {
+      type: Number,
+      min: 0,
     },
     uploadedAt: {
       type: String,
-      required: true,
     },
     uploadedBy: {
       type: String,
-      required: true,
       trim: true,
     },
     url: {

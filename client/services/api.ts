@@ -152,7 +152,10 @@ function parseAuthSession(value: unknown): AuthSession {
   };
 }
 
-function parseSupportAttachment(value: unknown): Attachment {
+function parseSupportAttachment(
+  value: unknown,
+  ticketNumber: string
+): Attachment {
   if (!isRecord(value)) {
     throw new Error('The support service returned an invalid attachment.');
   }
@@ -164,13 +167,20 @@ function parseSupportAttachment(value: unknown): Attachment {
         ? value._id
         : undefined;
   const rawUrl = typeof value.url === 'string' ? value.url : undefined;
+  const storageKey =
+    typeof value.storageKey === 'string' ? value.storageKey : undefined;
   const dataUrl =
     typeof value.dataUrl === 'string'
       ? value.dataUrl
       : rawUrl?.startsWith('data:')
         ? rawUrl
         : undefined;
-  const url = rawUrl?.startsWith('data:') ? undefined : rawUrl;
+  const url = rawUrl?.startsWith('data:')
+    ? undefined
+    : rawUrl ||
+      (storageKey && id
+        ? `${SPRING_BOOT_API_CONFIG.baseUrl.replace(/\/$/, '')}/support/tickets/${encodeURIComponent(ticketNumber)}/attachments/${encodeURIComponent(id)}`
+        : undefined);
   const fileName =
     typeof value.fileName === 'string'
       ? value.fileName
@@ -225,14 +235,19 @@ function parseSupportAttachment(value: unknown): Attachment {
   };
 }
 
-function parseSupportAttachments(value: unknown): Attachment[] {
+function parseSupportAttachments(
+  value: unknown,
+  ticketNumber: string
+): Attachment[] {
   if (value === undefined) {
     return [];
   }
   if (!Array.isArray(value)) {
     throw new Error('The support service returned an invalid attachment list.');
   }
-  return value.map(parseSupportAttachment);
+  return value.map((attachment) =>
+    parseSupportAttachment(attachment, ticketNumber)
+  );
 }
 
 function parseSupportTicket(value: unknown): SupportTicketRecord {
@@ -278,7 +293,7 @@ function parseSupportTicket(value: unknown): SupportTicketRecord {
     status,
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
-    attachments: parseSupportAttachments(value.attachments),
+    attachments: parseSupportAttachments(value.attachments, value.ticketNumber),
     messages: messages.map((message) => {
       if (!isRecord(message)) {
         throw new Error('The support service returned an invalid ticket message.');
@@ -312,10 +327,48 @@ function parseSupportTicket(value: unknown): SupportTicketRecord {
         body: message.body,
         isInternalNote: message.isInternalNote,
         createdAt: message.createdAt,
-        attachments: parseSupportAttachments(message.attachments),
+        attachments: parseSupportAttachments(
+          message.attachments,
+          value.ticketNumber
+        ),
       };
     }),
   };
+}
+
+function createTicketFormData(
+  fields: Record<string, string>,
+  attachments: Attachment[]
+): FormData {
+  const formData = new FormData();
+  for (const [name, value] of Object.entries(fields)) {
+    formData.append(name, value);
+  }
+
+  for (const attachment of attachments) {
+    const match =
+      typeof attachment.dataUrl === 'string'
+        ? /^data:([a-z0-9.+-]+\/[a-z0-9.+-]+);base64,([A-Za-z0-9+/]+={0,2})$/i.exec(
+            attachment.dataUrl
+          )
+        : null;
+    if (!match || (attachment.mimeType && attachment.mimeType !== match[1])) {
+      throw new Error(`Could not prepare "${attachment.fileName}" for upload.`);
+    }
+
+    const binary = atob(match[2]);
+    const bytes = Uint8Array.from(binary, (character) =>
+      character.charCodeAt(0)
+    );
+    const contents = new Uint8Array(bytes).buffer;
+    formData.append(
+      'attachments',
+      new Blob([contents], { type: match[1] }),
+      attachment.fileName
+    );
+  }
+
+  return formData;
 }
 
 async function supportRequest(path: string, options: RequestInit = {}): Promise<unknown> {
@@ -327,7 +380,9 @@ async function supportRequest(path: string, options: RequestInit = {}): Promise<
         ...options,
         credentials: 'include',
         headers: {
-          'Content-Type': 'application/json',
+          ...(typeof FormData !== 'undefined' && options.body instanceof FormData
+            ? {}
+            : { 'Content-Type': 'application/json' }),
           ...(options.headers || {}),
         },
       }
@@ -567,7 +622,10 @@ export const HelpDeskApiService = {
     ): Promise<SupportTicketRecord> => {
       const data = await supportRequest(`/${encodeURIComponent(ticketNumber)}/messages`, {
         method: 'POST',
-        body: JSON.stringify({ body, isInternalNote, attachments }),
+        body: createTicketFormData(
+          { body, isInternalNote: String(isInternalNote) },
+          attachments
+        ),
       });
 
       return parseSupportTicket(data);
@@ -592,17 +650,23 @@ export const HelpDeskApiService = {
         attachments: Attachment[];
       }
     ): Promise<{ id: string }> => {
+      const formData = createTicketFormData(
+        {
+          subject: input.subject,
+          description: input.description,
+          category: input.category,
+          priority: input.priority,
+        },
+        input.attachments
+      );
       let response: Response;
       try {
         response = await fetch(
           `${SPRING_BOOT_API_CONFIG.baseUrl.replace(/\/$/, '')}/support/tickets`,
           {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
             credentials: 'include',
-            body: JSON.stringify(input),
+            body: formData,
           }
         );
       } catch {
