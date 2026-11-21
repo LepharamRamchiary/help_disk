@@ -649,7 +649,7 @@ export const HelpDeskApiService = {
         priority: TicketPriority;
         attachments: Attachment[];
       }
-    ): Promise<{ id: string }> => {
+    ): Promise<SupportTicketRecord> => {
       const formData = createTicketFormData(
         {
           subject: input.subject,
@@ -691,12 +691,7 @@ export const HelpDeskApiService = {
         );
       }
 
-      const ticketNumber = body.data.ticketNumber;
-      if (typeof ticketNumber !== 'string' || !ticketNumber) {
-        throw new Error('The support service returned an invalid ticket.');
-      }
-
-      return { id: ticketNumber };
+      return parseSupportTicket(body.data);
     },
     exportToCsv: (tickets: Ticket[], filename = 'helpdesk-pro-tickets-export.csv') => {
       const headers = [

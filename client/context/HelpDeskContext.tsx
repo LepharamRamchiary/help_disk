@@ -392,6 +392,25 @@ export function HelpDeskProvider({ children }: { children: React.ReactNode }) {
   }, [addToast, applyAuthenticatedUser]);
 
   useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const ticketId = new URLSearchParams(window.location.search).get('ticket');
+    const ticket = ticketId
+      ? tickets.find((item) => item.id === ticketId)
+      : undefined;
+    if (
+      !ticket ||
+      (currentUser.role === 'CUSTOMER' &&
+        ticket.customerEmail.toLowerCase() !== currentUser.email.toLowerCase())
+    ) {
+      return;
+    }
+
+    setSelectedTicketId(ticket.id);
+    setCurrentView('ticket-detail');
+  }, [currentUser.email, currentUser.role, isAuthenticated, tickets]);
+
+  useEffect(() => {
     if (
       SPRING_BOOT_API_CONFIG.useMockAdapter ||
       !isAuthenticated ||
@@ -483,6 +502,17 @@ export function HelpDeskProvider({ children }: { children: React.ReactNode }) {
       }
       setCurrentView(view);
       if (typeof window !== 'undefined') {
+        const url = new URL(window.location.href);
+        if (view === 'ticket-detail' && options?.ticketId) {
+          url.searchParams.set('ticket', options.ticketId);
+        } else if (view !== 'ticket-detail') {
+          url.searchParams.delete('ticket');
+        }
+        window.history.replaceState(
+          window.history.state,
+          '',
+          `${url.pathname}${url.search}${url.hash}`
+        );
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     },
@@ -569,9 +599,9 @@ export function HelpDeskProvider({ children }: { children: React.ReactNode }) {
 
   const createTicket = useCallback(
     async (input: CreateTicketInput): Promise<Ticket> => {
-      let savedTicketId: string | undefined;
+      let savedTicket: SupportTicketRecord | undefined;
       if (!SPRING_BOOT_API_CONFIG.useMockAdapter && isAuthenticated) {
-        const created = await HelpDeskApiService.tickets.create(
+        savedTicket = await HelpDeskApiService.tickets.create(
           {
             subject: input.subject.trim(),
             description: input.description.trim(),
@@ -582,11 +612,10 @@ export function HelpDeskProvider({ children }: { children: React.ReactNode }) {
             attachments: input.attachments || [],
           }
         );
-        savedTicketId = created.id;
       }
 
       const nextNum = 1001 + tickets.length;
-      const newId = savedTicketId || `HD-${nextNum}`;
+      const newId = savedTicket?.ticketNumber || `HD-${nextNum}`;
       const customer =
         currentUser.role === 'CUSTOMER'
           ? customers.find((c) => c.email.toLowerCase() === currentUser.email.toLowerCase()) || {
@@ -611,57 +640,69 @@ export function HelpDeskProvider({ children }: { children: React.ReactNode }) {
           ? 1440
           : 4320;
 
-      const newTicket: Ticket = {
-        id: newId,
-        organizationId: currentOrgId,
-        subject: input.subject.trim(),
-        description: input.description.trim(),
-        status: 'OPEN',
-        priority: input.priority,
-        categoryId: category.id,
-        categoryName: category.name,
-        customerId: customer.id,
-        customerName: customer.fullName,
-        customerEmail: customer.email,
-        customerOrganization: customer.organization,
-        customerInitials: customer.avatarInitials,
-        assignedAgentId: agent ? agent.id : null,
-        assignedAgentName: agent ? agent.fullName : null,
-        assignedAgentInitials: agent ? agent.avatarInitials : null,
-        createdAt: '2026-10-11 09:40',
-        updatedAt: 'Just now',
-        dueDate: input.dueDate || '2026-10-12 17:00',
-        firstResponseDeadline: 'Today +1h',
-        resolutionDeadline: 'Tomorrow',
-        firstResponseRemainingMinutes: Math.round(slaTargetMinutes / 4),
-        resolutionRemainingMinutes: slaTargetMinutes,
-        slaStatus: 'WITHIN_SLA',
-        tags: input.tags && input.tags.length > 0 ? input.tags : [category.name.toLowerCase().split(' ')[0]],
-        messages: [
-          {
-            id: `msg-${Date.now()}`,
-            ticketId: newId,
-            authorId: currentUser.role === 'CUSTOMER' ? customer.id : currentUser.id,
-            authorName: currentUser.role === 'CUSTOMER' ? customer.fullName : currentUser.fullName,
-            authorRole: currentUser.role,
-            authorInitials:
-              currentUser.role === 'CUSTOMER' ? customer.avatarInitials : currentUser.avatarInitials,
-            body: input.description.trim(),
-            isInternalNote: false,
-            createdAt: 'Just now',
-            attachments: input.attachments || [],
-          },
-        ],
-        activities: [
-          {
-            id: `act-${Date.now()}`,
-            ticketId: newId,
-            actorName: currentUser.fullName,
-            action: `Created ticket ${newId} with ${input.priority} priority`,
-            timestamp: 'Just now',
-          },
-        ],
-      };
+      const newTicket: Ticket =
+        savedTicket && currentUser.role === 'CUSTOMER'
+          ? toHelpDeskTicket(savedTicket, currentUser, categories, customers)
+          : {
+              id: newId,
+              organizationId: currentOrgId,
+              subject: input.subject.trim(),
+              description: input.description.trim(),
+              status: 'OPEN',
+              priority: input.priority,
+              categoryId: category.id,
+              categoryName: category.name,
+              customerId: customer.id,
+              customerName: customer.fullName,
+              customerEmail: customer.email,
+              customerOrganization: customer.organization,
+              customerInitials: customer.avatarInitials,
+              assignedAgentId: agent ? agent.id : null,
+              assignedAgentName: agent ? agent.fullName : null,
+              assignedAgentInitials: agent ? agent.avatarInitials : null,
+              createdAt: '2026-10-11 09:40',
+              updatedAt: 'Just now',
+              dueDate: input.dueDate || '2026-10-12 17:00',
+              firstResponseDeadline: 'Today +1h',
+              resolutionDeadline: 'Tomorrow',
+              firstResponseRemainingMinutes: Math.round(slaTargetMinutes / 4),
+              resolutionRemainingMinutes: slaTargetMinutes,
+              slaStatus: 'WITHIN_SLA',
+              tags:
+                input.tags && input.tags.length > 0
+                  ? input.tags
+                  : [category.name.toLowerCase().split(' ')[0]],
+              messages: [
+                {
+                  id: `msg-${Date.now()}`,
+                  ticketId: newId,
+                  authorId:
+                    currentUser.role === 'CUSTOMER' ? customer.id : currentUser.id,
+                  authorName:
+                    currentUser.role === 'CUSTOMER'
+                      ? customer.fullName
+                      : currentUser.fullName,
+                  authorRole: currentUser.role,
+                  authorInitials:
+                    currentUser.role === 'CUSTOMER'
+                      ? customer.avatarInitials
+                      : currentUser.avatarInitials,
+                  body: input.description.trim(),
+                  isInternalNote: false,
+                  createdAt: 'Just now',
+                  attachments: input.attachments || [],
+                },
+              ],
+              activities: [
+                {
+                  id: `act-${Date.now()}`,
+                  ticketId: newId,
+                  actorName: currentUser.fullName,
+                  action: `Created ticket ${newId} with ${input.priority} priority`,
+                  timestamp: 'Just now',
+                },
+              ],
+            };
 
       setTickets((prev) => [newTicket, ...prev]);
       setSelectedTicketId(newId);
