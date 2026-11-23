@@ -60,6 +60,24 @@ export interface SupportTicketMessageRecord {
   attachments: Attachment[];
 }
 
+export interface TicketSummary {
+  totalTickets: number;
+  todayTickets: number;
+  byStatus: {
+    Open: number;
+    'In Progress': number;
+    Pending: number;
+    Resolved: number;
+    Closed: number;
+  };
+  byPriority: {
+    Low: number;
+    Medium: number;
+    High: number;
+    Urgent: number;
+  };
+}
+
 const SUPPORT_PRIORITIES = ['Low', 'Medium', 'High', 'Urgent'] as const;
 const SUPPORT_STATUSES = ['Open', 'In Progress', 'Pending', 'Resolved', 'Closed'] as const;
 
@@ -582,6 +600,16 @@ async function requestWithFallback<T>(
 }
 
 export const HelpDeskApiService = {
+  dashboard: {
+    summary: async (): Promise<TicketSummary> => {
+      const data = await supportRequest('/summary');
+      if (!isRecord(data) || !isRecord(data.byStatus) || !isRecord(data.byPriority)) {
+        throw new Error('The support service returned an invalid ticket summary.');
+      }
+
+      return data as unknown as TicketSummary;
+    },
+  },
   auth: {
     login: async (email: string, password: string) =>
       requestWithFallback('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }, () => ({
