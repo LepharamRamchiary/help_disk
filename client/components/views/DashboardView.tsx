@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useHelpDesk } from '@/context/HelpDeskContext';
-import { HelpDeskApiService } from '@/services/api';
+import { HelpDeskApiService, TicketSummary } from '@/services/api';
 import { VOLUME_CHART_DATA, TOP_USED_TAGS } from '@/lib/mock-data';
 import {
   StatusBadge,
@@ -57,29 +57,45 @@ export function DashboardView() {
   } = useHelpDesk();
 
   const [dateRange, setDateRange] = useState<'today' | '7d' | '30d' | '90d'>('30d');
+  const [ticketSummary, setTicketSummary] = useState<TicketSummary | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    HelpDeskApiService.dashboard.summary()
+      .then((summary) => {
+        if (active) setTicketSummary(summary);
+      })
+      .catch(() => {
+        if (active) setTicketSummary(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const firstName = currentUser.fullName.split(' ')[0];
 
   // Computed summary metrics
-  const openTicketsCount = useMemo(
-    () => tickets.filter((t) => t.status === 'OPEN' || t.status === 'IN_PROGRESS').length,
-    [tickets]
-  );
+  const openTicketsCount =
+    ticketSummary
+      ? ticketSummary.byStatus.Open + ticketSummary.byStatus['In Progress']
+      : tickets.filter((t) => t.status === 'OPEN' || t.status === 'IN_PROGRESS').length;
   const unassignedCount = useMemo(
     () => tickets.filter((t) => !t.assignedAgentId && t.status !== 'CLOSED').length,
     [tickets]
   );
-  const awaitingResponseCount = useMemo(
-    () =>
-      tickets.filter(
-        (t) => t.status === 'OPEN' || t.status === 'WAITING_FOR_CUSTOMER'
-      ).length,
-    [tickets]
-  );
-  const resolvedCount = useMemo(
-    () => tickets.filter((t) => t.status === 'RESOLVED' || t.status === 'CLOSED').length,
-    [tickets]
-  );
+  const awaitingResponseCount =
+    ticketSummary
+      ? ticketSummary.byStatus.Open + ticketSummary.byStatus.Pending
+      : tickets.filter(
+          (t) => t.status === 'OPEN' || t.status === 'WAITING_FOR_CUSTOMER'
+        ).length;
+  const resolvedCount =
+    ticketSummary
+      ? ticketSummary.byStatus.Resolved + ticketSummary.byStatus.Closed
+      : tickets.filter((t) => t.status === 'RESOLVED' || t.status === 'CLOSED').length;
 
   const statusDistribution = useMemo(() => {
     const counts = {
@@ -318,7 +334,7 @@ export function DashboardView() {
           </div>
           <div className="mt-3 flex items-baseline justify-between">
             <span className="text-3xl font-bold font-mono tabular-nums text-[#111827]">
-              {resolvedCount + 58}
+              {resolvedCount}
             </span>
             <span className="inline-flex items-center gap-1 text-xs font-medium text-[#047857] font-mono tabular-nums">
               <TrendingUp className="w-3.5 h-3.5" />
