@@ -294,13 +294,15 @@ function parseSupportTicket(value: unknown): SupportTicketRecord {
     throw new Error('The support service returned an invalid ticket.');
   }
 
+  const ticketNumber = value.ticketNumber;
+
   if (value.messages !== undefined && !Array.isArray(value.messages)) {
     throw new Error('The support service returned an invalid ticket message list.');
   }
   const messages = Array.isArray(value.messages) ? value.messages : [];
 
   return {
-    ticketNumber: value.ticketNumber,
+    ticketNumber,
     subject: value.subject,
     description: value.description,
     category: value.category,
@@ -311,7 +313,7 @@ function parseSupportTicket(value: unknown): SupportTicketRecord {
     status,
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
-    attachments: parseSupportAttachments(value.attachments, value.ticketNumber),
+    attachments: parseSupportAttachments(value.attachments, ticketNumber),
     messages: messages.map((message) => {
       if (!isRecord(message)) {
         throw new Error('The support service returned an invalid ticket message.');
@@ -347,7 +349,7 @@ function parseSupportTicket(value: unknown): SupportTicketRecord {
         createdAt: message.createdAt,
         attachments: parseSupportAttachments(
           message.attachments,
-          value.ticketNumber
+          ticketNumber
         ),
       };
     }),
