@@ -634,6 +634,14 @@ export const HelpDeskApiService = {
 
       return data.map(parseSupportTicket);
     },
+    today: async (): Promise<SupportTicketRecord[]> => {
+      const data = await supportRequest('/today');
+      if (!Array.isArray(data)) {
+        throw new Error('The support service returned an invalid today ticket list.');
+      }
+
+      return data.map(parseSupportTicket);
+    },
     all: async (): Promise<SupportTicketRecord[]> => {
       const data = await supportRequest('');
       if (!Array.isArray(data)) {
