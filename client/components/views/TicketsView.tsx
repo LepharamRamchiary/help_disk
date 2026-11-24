@@ -57,6 +57,8 @@ export function TicketsView() {
   const [agentFilter, setAgentFilter] = useState<string>('ALL');
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
   const [dateFilter, setDateFilter] = useState<string>('ALL');
+  const [todayTicketIds, setTodayTicketIds] = useState<Set<string> | null>(null);
+  const [todayLoading, setTodayLoading] = useState(false);
 
   const [sortField, setSortField] = useState<SortField>('id');
   const [sortAsc, setSortAsc] = useState<boolean>(false);
@@ -68,6 +70,56 @@ export function TicketsView() {
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => {
+    if (dateFilter !== 'TODAY') return;
+
+    if (currentUser.role !== 'PLATFORM_ADMIN') {
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date();
+      endOfDay.setHours(23, 59, 59, 999);
+      setTodayTicketIds(
+        new Set(
+          tickets
+            .filter((ticket) => {
+              const createdAt = new Date(ticket.createdAt);
+              return !Number.isNaN(createdAt.getTime()) &&
+                createdAt >= startOfDay &&
+                createdAt <= endOfDay;
+            })
+            .map((ticket) => ticket.id)
+        )
+      );
+      setTodayLoading(false);
+      return;
+    }
+
+    let active = true;
+    setTodayLoading(true);
+    HelpDeskApiService.tickets
+      .today()
+      .then((records) => {
+        if (active) setTodayTicketIds(new Set(records.map((ticket) => ticket.ticketNumber)));
+      })
+      .catch((error: unknown) => {
+        if (active) {
+          setTodayTicketIds(new Set());
+          addToast(
+            'Could not load today’s tickets',
+            error instanceof Error ? error.message : 'Please try again.',
+            'error'
+          );
+        }
+      })
+      .finally(() => {
+        if (active) setTodayLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [dateFilter, addToast, currentUser.role, tickets]);
 
   // Sync sidebar route to initial saved tab
   useEffect(() => {
@@ -169,7 +221,7 @@ export function TicketsView() {
         )
           return false;
         if (categoryFilter !== 'ALL' && t.categoryId !== categoryFilter) return false;
-        if (dateFilter === 'TODAY' && !t.createdAt.startsWith('2026-10-11')) return false;
+        if (dateFilter === 'TODAY' && !todayTicketIds?.has(t.id)) return false;
         if (dateFilter === 'RECENT' && t.createdAt.startsWith('2026-10-05')) return false;
 
         return true;
@@ -197,6 +249,7 @@ export function TicketsView() {
     agentFilter,
     categoryFilter,
     dateFilter,
+    todayTicketIds,
     sortField,
     sortAsc,
   ]);
@@ -563,7 +616,15 @@ export function TicketsView() {
             {(
               [
                 { id: 'ALL', label: 'Any Time' },
-                { id: 'TODAY', label: 'Today (Oct 11)' },
+                {
+                  id: 'TODAY',
+                  label: todayLoading
+                    ? 'Today (Loading...)'
+                    : `Today (${new Intl.DateTimeFormat('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                      }).format(new Date())})`,
+                },
                 { id: 'RECENT', label: 'Last 7 Days' },
               ] as const
             ).map((d) => (
