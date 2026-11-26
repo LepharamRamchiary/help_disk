@@ -128,7 +128,7 @@ async function authRequest(path: string, options: RequestInit = {}): Promise<unk
         ...options,
         credentials: 'include',
         headers: {
-          'Content-Type': 'application/json',
+          ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
           ...(options.headers || {}),
         },
       }
